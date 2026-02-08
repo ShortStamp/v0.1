@@ -1,15 +1,54 @@
+export type CategoryKey =
+  | "foundation"
+  | "concealer"
+  | "primer"
+  | "powder"
+  | "blush"
+  | "bronzer"
+  | "highlighter"
+  | "contour"
+  | "eyeshadow"
+  | "eyeliner"
+  | "mascara"
+  | "false-lashes"
+  | "brow-pencil"
+  | "brow-gel"
+  | "lipstick"
+  | "lip-gloss"
+  | "lip-liner"
+  | "setting-spray";
+
+export interface CategoryGroup {
+  key: string;
+  label: string;
+  categories: CategoryKey[];
+}
+
+export interface ProductFilter {
+  key: string;
+  label: string;
+  type: "checkbox" | "range";
+  options?: string[];
+}
+
+export interface CategoryDefinition {
+  key: CategoryKey;
+  label: string;
+  filters: ProductFilter[];
+}
+
 export interface Product {
   id: string;
   name: string;
   brand: string;
   image: string;
-  category: string;
-  region: FaceRegion;
+  category: CategoryKey;
   stampScore: number;
   prices: RetailerPrice[];
   description?: string;
   specs?: string[];
   reviews?: Review[];
+  filters: Record<string, string | boolean | number>;
 }
 
 export interface RetailerPrice {
@@ -37,15 +76,16 @@ export interface Trend {
   articles?: { title: string; url: string }[];
 }
 
-export type FaceRegion = "eyes" | "lips" | "cheeks" | "brows" | "skin" | "lashes";
-
-export interface FaceCategory {
-  region: FaceRegion;
-  label: string;
-  categories: string[];
+export interface ToolboxSlot {
+  category: CategoryKey;
+  product: Product | null;
 }
 
-export interface ToolboxSlot {
-  region: FaceRegion;
-  product: Product | null;
+export interface BeautyProfile {
+  skinTone: string;
+  undertone: string;
+  skinType: string;
+  coverage: string;
+  finish: string;
+  budget: string;
 }
