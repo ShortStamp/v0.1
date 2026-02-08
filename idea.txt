@@ -1,0 +1,55 @@
+Description: 
+
+
+Shortstamp MVP
+Allows you to search for, and find a specific item
+There is an item set toolbox
+You put a specific item in each slot of the toolbox
+It will tell you at the bottom if the item matches with the set as a whole
+Item can take you to a page where it tells you all the cheapest places to buy something
+
+Page List
+Landing page -
+Build page - center (page with face) 
+Ai prompt explaining what style you want (Describe What Style You Want
+pop up 1
+Lists out categories under that part of the face. Ex. 
+pop up window 2 - product finder page
+Specific Product price finder
+Buy mechanism
+
+You click build on the landing page
+You see a page with categories 
+
+
+
+
+
+Stuff to figure out:
+Company name
+
+
+
+Future
+An AI-powered beauty trends engine that detects what’s actually taking off in real time, cuts through paid hype, and lets users instantly compare where to buy trending products at the best price—like StockX charts + Google Shopping, but for makeup.
+Allows u to take a photo of urself and filter the styles based on ur face
+Using this app feels like opening a real-time beauty market dashboard that shows what’s hot, what fits you, and where to buy it smartly — without noise, pressure, or guessing.
+
+Qualities
+Must have a homepage that gives you titles and pictures of the names of make up trends, for you to click on and explore more. 
+When you click and explore more, it sorts out all the products that make that trend, a list of videos you can watch, or articles to read about that trend. 
+You can click on individual products and see the competition of where to buy it from and how cheap it could be. 
+Must allow you to choose which general makeup styles you are most interested in, but after taking a picture of your face, it must give you a page for the most trending styles that match you specifically. - pc part picker part - 
+Each tab where you can click to explore a trend, must give significant data on how trendy something is, this must be conveyed clearly through a shortstamp, which grades the trend on popularity and recency. The higher shortstamp for each subcategory (broader style you choose, or face matching) appears at the top of your algorithm. 
+
+Specifics
+Bar on top allows you to filter trend based on face/choices, or trends in general
+The shortstamp should really convey trends that haven’t picked up yet, but are projected to shoot up. 
+Give you notifications to opt in to trend information. 
+Implement a trend of price changes for each individual product
+
+
+For big companies such as Sephora, Ulta Beauty, Amazon, we should get our own affiliate links (requires contacting directly for partnership)
+For the other companies, we can use affiliate networks like Rakuten Advertising and check if they have an affiliate program.
+Use API to fetch links to the products
+For reviews, specs of the product, name, and pics we can use webscrapers that fetch the info. (Only webscrape if it is allowed by ToS)
