@@ -1,0 +1,1 @@
+# ShortStamp v0.1
