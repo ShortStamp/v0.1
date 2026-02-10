@@ -221,8 +221,8 @@ export const categoryGroups: CategoryGroup[] = [
   { key: "base", label: "Base", categories: ["foundation", "concealer", "primer", "powder", "setting-spray"] },
   { key: "eyes", label: "Eyes", categories: ["eyeshadow", "eyeliner", "mascara", "false-lashes"] },
   { key: "brows", label: "Brows", categories: ["brow-pencil", "brow-gel"] },
-  { key: "cheeks", label: "Cheeks", categories: ["blush", "bronzer", "highlighter", "contour"] },
-  { key: "lips", label: "Lips", categories: ["lipstick", "lip-gloss", "lip-liner"] },
+  { key: "cheeks", label: "Cheeks", categories: ["contour", "bronzer", "blush", "highlighter"] },
+  { key: "lips", label: "Lips", categories: ["lip-liner", "lipstick", "lip-gloss"] },
 ];
 
 export const categoryMap: Record<CategoryKey, CategoryDefinition> = Object.fromEntries(

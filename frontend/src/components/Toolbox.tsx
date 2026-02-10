@@ -16,11 +16,17 @@ export default function Toolbox({ slots }: ToolboxProps) {
   const isComplete = filledSlots.length >= 3;
 
   return (
-    <div className="mt-6 rounded-xl border border-border bg-background p-4">
+    <div
+      className={`mt-8 border p-5 transition-colors ${
+        isComplete
+          ? "border-black bg-black text-white"
+          : "border-border bg-neutral-50"
+      }`}
+    >
       <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
         <div
-          className={`flex items-center gap-2 text-sm ${
-            isComplete ? "text-green-700" : "text-foreground/50"
+          className={`flex items-center gap-2 text-xs uppercase tracking-[0.1em] ${
+            isComplete ? "text-white" : "text-neutral-400"
           }`}
         >
           {isComplete ? (
@@ -36,7 +42,7 @@ export default function Toolbox({ slots }: ToolboxProps) {
           )}
         </div>
         <p className="text-lg font-bold">
-          Total: <span className="text-accent">${total.toFixed(2)}</span>
+          Total: ${total.toFixed(2)}
         </p>
       </div>
     </div>

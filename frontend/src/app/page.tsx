@@ -7,68 +7,65 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="flex flex-col items-center gap-6 px-4 pb-16 pt-24 text-center">
-        <div className="flex items-center gap-2 rounded-full bg-accent/10 px-4 py-1.5 text-sm font-medium text-accent">
-          <Palette className="h-4 w-4" />
-          Beauty Trends & Price Comparison
-        </div>
-
-        <h1 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
+      <section className="flex flex-col items-center gap-6 px-4 pb-20 pt-28 text-center">
+        <h1 className="max-w-2xl text-4xl font-bold uppercase leading-tight tracking-tight sm:text-5xl">
           Discover What&apos;s Trending.
           <br />
-          <span className="text-accent">Build Your Perfect Look.</span>
+          Build Your Perfect Look.
         </h1>
 
-        <p className="max-w-lg text-lg text-foreground/60">
+        <p className="max-w-lg text-base text-neutral-500">
           Search trending makeup styles, build your toolbox, and find the best
           prices across every retailer — all in one place.
         </p>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col items-center gap-4 pt-2">
           <Link
             href="/build"
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-semibold text-white transition-opacity hover:opacity-90"
+            className="inline-flex items-center gap-2 bg-black px-10 py-3.5 text-xs font-medium uppercase tracking-[0.15em] text-white transition-opacity hover:opacity-80"
           >
             Start Building <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             href="/trends"
-            className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3 font-semibold transition-colors hover:bg-muted"
+            className="text-xs font-medium uppercase tracking-[0.1em] text-neutral-400 underline underline-offset-4 hover:text-black"
           >
-            Explore Trends
+            or explore trends
           </Link>
         </div>
       </section>
 
       {/* How it works */}
-      <section className="border-t border-border bg-muted px-4 py-16">
+      <section className="border-t border-border bg-neutral-50 px-4 py-20">
         <div className="mx-auto max-w-4xl">
-          <h2 className="mb-10 text-center text-2xl font-bold">How It Works</h2>
-          <div className="grid gap-8 sm:grid-cols-3">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
-                <Search className="h-6 w-6" />
+          <h2 className="mb-12 text-center text-xs font-medium uppercase tracking-[0.2em] text-neutral-400">
+            How It Works
+          </h2>
+          <div className="grid gap-10 sm:grid-cols-3">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="flex h-12 w-12 items-center justify-center border border-black">
+                <Search className="h-5 w-5" />
               </div>
-              <h3 className="font-semibold">Discover Trends</h3>
-              <p className="text-sm text-foreground/60">
+              <h3 className="text-sm font-bold uppercase tracking-wide">Discover Trends</h3>
+              <p className="text-sm text-neutral-500">
                 Browse trending makeup styles scored by our ShortStamp algorithm.
               </p>
             </div>
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
-                <Palette className="h-6 w-6" />
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="flex h-12 w-12 items-center justify-center border border-black">
+                <Palette className="h-5 w-5" />
               </div>
-              <h3 className="font-semibold">Build Your Look</h3>
-              <p className="text-sm text-foreground/60">
+              <h3 className="text-sm font-bold uppercase tracking-wide">Build Your Look</h3>
+              <p className="text-sm text-neutral-500">
                 Pick products for each part of your face and see if they match as a set.
               </p>
             </div>
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
-                <TrendingUp className="h-6 w-6" />
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="flex h-12 w-12 items-center justify-center border border-black">
+                <TrendingUp className="h-5 w-5" />
               </div>
-              <h3 className="font-semibold">Compare Prices</h3>
-              <p className="text-sm text-foreground/60">
+              <h3 className="text-sm font-bold uppercase tracking-wide">Compare Prices</h3>
+              <p className="text-sm text-neutral-500">
                 Find the cheapest place to buy every product across all major retailers.
               </p>
             </div>
@@ -77,13 +74,13 @@ export default function Home() {
       </section>
 
       {/* Trending now */}
-      <section className="px-4 py-16">
+      <section className="px-4 py-20">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-8 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Trending Now</h2>
+          <div className="mb-10 flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-[0.15em]">Trending Now</h2>
             <Link
               href="/trends"
-              className="text-sm font-medium text-accent hover:underline"
+              className="text-xs font-medium uppercase tracking-[0.1em] text-neutral-500 underline underline-offset-4 hover:text-black"
             >
               View all
             </Link>

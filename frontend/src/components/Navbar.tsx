@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/build", label: "Build" },
-  { href: "/trends", label: "Trends" },
-  { href: "/profile", label: "Profile" },
+  { href: "/", label: "HOME" },
+  { href: "/build", label: "BUILD" },
+  { href: "/trends", label: "TRENDS" },
+  { href: "/profile", label: "PROFILE" },
 ];
 
 export default function Navbar() {
@@ -17,11 +17,13 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-          <Sparkles className="h-6 w-6 text-accent" />
-          ShortStamp
+    <nav className="sticky top-0 z-50 border-b border-border bg-white">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+        <Link
+          href="/"
+          className="text-base font-bold uppercase tracking-[0.2em]"
+        >
+          SHORTSTAMP
         </Link>
 
         {/* Desktop nav */}
@@ -30,8 +32,10 @@ export default function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm font-medium transition-colors hover:text-accent ${
-                pathname === link.href ? "text-accent" : "text-foreground/70"
+              className={`text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-black ${
+                pathname === link.href
+                  ? "text-black underline underline-offset-4"
+                  : "text-neutral-500"
               }`}
             >
               {link.label}
@@ -41,24 +45,26 @@ export default function Navbar() {
 
         {/* Mobile toggle */}
         <button
-          className="md:hidden"
+          className="p-2 md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
       {/* Mobile nav */}
       {mobileOpen && (
-        <div className="border-t border-border bg-background px-4 pb-4 md:hidden">
+        <div className="border-t border-border bg-white px-6 pb-4 md:hidden">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-              className={`block py-3 text-sm font-medium transition-colors hover:text-accent ${
-                pathname === link.href ? "text-accent" : "text-foreground/70"
+              className={`block py-3 text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-black ${
+                pathname === link.href
+                  ? "text-black underline underline-offset-4"
+                  : "text-neutral-500"
               }`}
             >
               {link.label}
