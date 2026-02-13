@@ -21,7 +21,7 @@ export default function Home() {
 
         <div className="flex flex-col items-center gap-4 pt-2">
           <Link
-            href="/build"
+            href="/quiz"
             className="inline-flex items-center gap-2 bg-black px-10 py-3.5 text-xs font-medium uppercase tracking-[0.15em] text-white transition-opacity hover:opacity-80"
           >
             Start Building <ArrowRight className="h-4 w-4" />
