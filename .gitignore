@@ -5,7 +5,6 @@ bower_components/
 
 # Build output
 dist/
-build/
 out/
 .next/
 .nuxt/

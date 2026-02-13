@@ -1,9 +1,10 @@
 import { sampleProducts } from "@/lib/data";
 import ShortStampBadge from "@/components/ShortStampBadge";
 import PriceComparisonTable from "@/components/PriceComparisonTable";
-import { ArrowLeft, ShoppingBag } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import SaveProductButton from "@/components/SaveProductButton";
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -15,7 +16,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   if (!product) return notFound();
 
-  const lowestPrice = Math.min(...product.prices.map((p) => p.price));
+  const sorted = [...product.prices].sort((a, b) => a.price - b.price);
+  const lowestPrice = sorted[0]?.price;
+  const bestRetailer = sorted[0];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -23,7 +26,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         href="/build"
         className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-accent"
       >
-        <ArrowLeft className="h-4 w-4" /> Back
+        <ArrowLeft className="h-4 w-4" /> Back to Build
       </Link>
 
       <div className="mb-8 grid gap-8 md:grid-cols-2">
@@ -53,6 +56,21 @@ export default async function ProductPage({ params }: ProductPageProps) {
               ))}
             </ul>
           )}
+
+          {/* Action buttons */}
+          <div className="mt-4 flex flex-col gap-3">
+            {bestRetailer && (
+              <a
+                href={bestRetailer.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
+              >
+                Buy Now — ${lowestPrice.toFixed(2)} at {bestRetailer.retailer}
+              </a>
+            )}
+            <SaveProductButton productId={product.id} category={product.category} />
+          </div>
         </div>
       </div>
 
