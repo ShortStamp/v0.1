@@ -22,7 +22,7 @@ export default function TrendsPage() {
       </div>
 
       {filter === "For You" && (
-        <div className="mt-8 rounded-xl border border-border bg-muted p-8 text-center">
+        <div className="mt-8 rounded-2xl border border-border bg-muted p-8 text-center">
           <p className="text-foreground/60">
             Upload a photo in your{" "}
             <a href="/profile" className="font-medium text-accent hover:underline">

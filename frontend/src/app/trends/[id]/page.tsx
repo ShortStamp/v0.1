@@ -19,7 +19,7 @@ export default async function TrendDetailPage({ params }: TrendDetailPageProps) 
     <div className="mx-auto max-w-4xl px-4 py-8">
       <Link
         href="/trends"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-foreground"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-accent"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Trends
       </Link>
@@ -45,7 +45,7 @@ export default async function TrendDetailPage({ params }: TrendDetailPageProps) 
       {/* Videos placeholder */}
       <section className="mb-10">
         <h2 className="mb-4 text-xl font-semibold">Videos</h2>
-        <div className="rounded-xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
+        <div className="rounded-2xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
           Video content coming soon — tutorial and review embeds will appear here.
         </div>
       </section>
@@ -53,7 +53,7 @@ export default async function TrendDetailPage({ params }: TrendDetailPageProps) 
       {/* Articles placeholder */}
       <section>
         <h2 className="mb-4 text-xl font-semibold">Articles</h2>
-        <div className="rounded-xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
+        <div className="rounded-2xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
           Related articles and guides will appear here.
         </div>
       </section>

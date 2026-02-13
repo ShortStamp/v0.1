@@ -21,15 +21,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <div className="mx-auto max-w-4xl px-4 py-8">
       <Link
         href="/build"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-foreground"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-accent"
       >
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>
 
       <div className="mb-8 grid gap-8 md:grid-cols-2">
         {/* Product image placeholder */}
-        <div className="flex h-72 items-center justify-center rounded-xl bg-muted">
-          <ShoppingBag className="h-20 w-20 text-foreground/15" />
+        <div className="flex h-72 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50">
+          <ShoppingBag className="h-20 w-20 text-pink-300" />
         </div>
 
         {/* Product info */}
@@ -65,7 +65,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       {/* Price history placeholder */}
       <section>
         <h2 className="mb-4 text-xl font-semibold">Price History</h2>
-        <div className="rounded-xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
+        <div className="rounded-2xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
           Price history chart coming soon — track price changes over time.
         </div>
       </section>

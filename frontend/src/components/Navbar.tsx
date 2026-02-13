@@ -17,11 +17,11 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border bg-white">
+    <nav className="sticky top-0 z-50 border-b border-border bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link
           href="/"
-          className="text-base font-bold uppercase tracking-[0.2em]"
+          className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-base font-bold uppercase tracking-[0.2em] text-transparent"
         >
           SHORTSTAMP
         </Link>
@@ -32,10 +32,10 @@ export default function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-black ${
+              className={`text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-accent ${
                 pathname === link.href
-                  ? "text-black underline underline-offset-4"
-                  : "text-neutral-500"
+                  ? "text-accent underline underline-offset-4 decoration-accent-light"
+                  : "text-foreground/50"
               }`}
             >
               {link.label}
@@ -45,7 +45,7 @@ export default function Navbar() {
 
         {/* Mobile toggle */}
         <button
-          className="p-2 md:hidden"
+          className="rounded-xl p-2 transition-colors hover:bg-muted md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
@@ -55,16 +55,16 @@ export default function Navbar() {
 
       {/* Mobile nav */}
       {mobileOpen && (
-        <div className="border-t border-border bg-white px-6 pb-4 md:hidden">
+        <div className="border-t border-border bg-white/95 backdrop-blur-md px-6 pb-4 md:hidden">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-              className={`block py-3 text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-black ${
+              className={`block py-3 text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-accent ${
                 pathname === link.href
-                  ? "text-black underline underline-offset-4"
-                  : "text-neutral-500"
+                  ? "text-accent underline underline-offset-4 decoration-accent-light"
+                  : "text-foreground/50"
               }`}
             >
               {link.label}

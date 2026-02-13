@@ -10,9 +10,9 @@ interface TrendCardProps {
 export default function TrendCard({ trend }: TrendCardProps) {
   return (
     <Link href={`/trends/${trend.id}`}>
-      <div className="group overflow-hidden rounded-xl border border-border bg-background transition-shadow hover:shadow-lg">
-        <div className="flex h-48 items-center justify-center bg-muted">
-          <Flame className="h-12 w-12 text-foreground/20" />
+      <div className="group overflow-hidden rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
+        <div className="flex h-48 items-center justify-center bg-gradient-to-br from-pink-50 via-muted to-fuchsia-50">
+          <Flame className="h-12 w-12 text-pink-300" />
         </div>
         <div className="flex flex-col gap-2 p-4">
           <div className="flex items-start justify-between gap-2">

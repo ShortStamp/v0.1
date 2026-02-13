@@ -10,7 +10,7 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
   const lowestPrice = sorted[0]?.price;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border">
+    <div className="overflow-hidden rounded-2xl border border-border">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-muted">
@@ -48,7 +48,7 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
               <td className="px-4 py-3 text-right">
                 <a
                   href={item.url}
-                  className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                  className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
                 >
                   Buy <ExternalLink className="h-3 w-3" />
                 </a>

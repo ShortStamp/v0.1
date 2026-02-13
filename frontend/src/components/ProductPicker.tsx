@@ -66,7 +66,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
 
       {/* Search bar + view toggle */}
       <div className="flex items-center gap-3 border-b border-border px-6 py-3">
-        <div className="flex flex-1 items-center gap-2 rounded-lg border border-border px-3 py-2">
+        <div className="flex flex-1 items-center gap-2 rounded-full border border-border px-4 py-2">
           <Search className="h-4 w-4 text-foreground/40" />
           <input
             type="text"
@@ -76,17 +76,17 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground/40"
           />
         </div>
-        <div className="flex rounded-lg border border-border">
+        <div className="flex rounded-full border border-border overflow-hidden">
           <button
             onClick={() => setViewMode("tiles")}
-            className={`rounded-l-lg p-2 ${viewMode === "tiles" ? "bg-accent text-white" : "text-foreground/50 hover:bg-muted"}`}
+            className={`p-2 ${viewMode === "tiles" ? "bg-accent text-white" : "text-foreground/50 hover:bg-muted"}`}
             aria-label="Tile view"
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
           <button
             onClick={() => setViewMode("list")}
-            className={`rounded-r-lg p-2 ${viewMode === "list" ? "bg-accent text-white" : "text-foreground/50 hover:bg-muted"}`}
+            className={`p-2 ${viewMode === "list" ? "bg-accent text-white" : "text-foreground/50 hover:bg-muted"}`}
             aria-label="List view"
           >
             <List className="h-4 w-4" />
@@ -147,7 +147,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                       </td>
                       <td className="hidden px-4 py-3 sm:table-cell">
                         <span className="inline-flex items-center gap-1 text-xs">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <Star className="h-3.5 w-3.5 fill-pink-400 text-pink-400" />
                           {product.stampScore}
                         </span>
                       </td>
@@ -157,7 +157,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => onSelect(product)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+                          className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white hover:brightness-110"
                         >
                           <Plus className="h-3.5 w-3.5" /> Add
                         </button>
@@ -171,10 +171,10 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                 {filtered.map((product) => (
                   <div
                     key={product.id}
-                    className="flex flex-col rounded-xl border border-border bg-background transition-shadow hover:shadow-lg"
+                    className="flex flex-col rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10"
                   >
-                    <div className="flex h-36 items-center justify-center bg-muted rounded-t-xl">
-                      <span className="text-3xl text-foreground/10">
+                    <div className="flex h-36 items-center justify-center bg-gradient-to-br from-pink-50 via-muted to-rose-50 rounded-t-2xl">
+                      <span className="text-3xl text-pink-300">
                         {category.label.charAt(0)}
                       </span>
                     </div>
@@ -184,8 +184,8 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                           <p className="text-xs text-foreground/50">{product.brand}</p>
                           <h3 className="text-sm font-semibold leading-tight">{product.name}</h3>
                         </div>
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-pink-50 px-2 py-0.5 text-xs font-medium text-pink-600">
+                          <Star className="h-3 w-3 fill-pink-400 text-pink-400" />
                           {product.stampScore}
                         </span>
                       </div>
@@ -194,7 +194,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                       </p>
                       <button
                         onClick={() => onSelect(product)}
-                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
+                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-3 py-2 text-sm font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
                       >
                         <Plus className="h-4 w-4" /> Add
                       </button>

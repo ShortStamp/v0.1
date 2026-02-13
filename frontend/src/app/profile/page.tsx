@@ -51,16 +51,16 @@ export default function ProfilePage() {
             <h2 className="text-xl font-semibold">Beauty Profile</h2>
             <Link
               href="/quiz"
-              className="inline-flex items-center gap-2 text-sm font-medium text-neutral-500 hover:text-black"
+              className="inline-flex items-center gap-2 text-sm font-medium text-foreground/50 hover:text-accent"
             >
               <Edit className="h-4 w-4" />
               Retake Quiz
             </Link>
           </div>
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-6">
+          <div className="rounded-2xl border border-border bg-muted p-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
                   Skin Tone
                 </div>
                 <div className="text-sm font-semibold">
@@ -68,7 +68,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
                   Undertone
                 </div>
                 <div className="text-sm font-semibold">
@@ -76,7 +76,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
                   Skin Type
                 </div>
                 <div className="text-sm font-semibold">
@@ -84,7 +84,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
                   Coverage
                 </div>
                 <div className="text-sm font-semibold">
@@ -92,7 +92,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
                   Finish
                 </div>
                 <div className="text-sm font-semibold">
@@ -100,7 +100,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
                   Budget
                 </div>
                 <div className="text-sm font-semibold">
@@ -113,13 +113,13 @@ export default function ProfilePage() {
       ) : (
         <section className="mb-10">
           <h2 className="mb-4 text-xl font-semibold">Beauty Profile</h2>
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-6 text-center">
-            <p className="mb-4 text-sm text-neutral-600">
+          <div className="rounded-2xl border border-border bg-muted p-6 text-center">
+            <p className="mb-4 text-sm text-foreground/60">
               Complete the quiz to get personalized product recommendations.
             </p>
             <Link
               href="/quiz"
-              className="inline-flex items-center gap-2 bg-black px-6 py-3 text-xs font-medium uppercase tracking-[0.15em] text-white transition-opacity hover:opacity-80"
+              className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-xs font-medium uppercase tracking-[0.15em] text-white shadow-md shadow-accent/20 transition-all hover:shadow-lg hover:shadow-accent/25 hover:brightness-110"
             >
               Take the Quiz
             </Link>
@@ -134,8 +134,8 @@ export default function ProfilePage() {
           Upload a photo to get trend recommendations matched to your face shape
           and features.
         </p>
-        <div className="flex h-48 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border transition-colors hover:border-accent hover:bg-accent/5">
-          <Upload className="h-8 w-8 text-foreground/30" />
+        <div className="flex h-48 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border transition-colors hover:border-accent hover:bg-accent/5">
+          <Upload className="h-8 w-8 text-pink-300" />
           <p className="text-sm font-medium text-foreground/50">
             Click to upload a photo
           </p>
@@ -154,10 +154,10 @@ export default function ProfilePage() {
             <button
               key={style}
               onClick={() => toggleStyle(style)}
-              className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
                 selectedStyles.includes(style)
-                  ? "border-accent bg-accent/10 text-accent"
-                  : "border-border text-foreground/60 hover:border-accent/50"
+                  ? "border-accent bg-accent/10 text-accent shadow-sm"
+                  : "border-border text-foreground/60 hover:border-accent/50 hover:text-accent"
               }`}
             >
               {style}
@@ -171,9 +171,9 @@ export default function ProfilePage() {
         <h2 className="mb-4 text-xl font-semibold">Notifications</h2>
         <button
           onClick={() => setNotifications(!notifications)}
-          className={`flex items-center gap-3 rounded-xl border px-5 py-4 transition-colors ${
+          className={`flex items-center gap-3 rounded-2xl border px-5 py-4 transition-all ${
             notifications
-              ? "border-accent bg-accent/5"
+              ? "border-accent bg-accent/5 shadow-sm"
               : "border-border hover:border-accent/50"
           }`}
         >

@@ -16,8 +16,8 @@ export default function FilterBar({ activeFilter, onFilterChange }: FilterBarPro
           onClick={() => onFilterChange(filter)}
           className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
             activeFilter === filter
-              ? "bg-accent text-white"
-              : "bg-muted text-foreground/60 hover:bg-foreground/10"
+              ? "bg-accent text-white shadow-md shadow-accent/20"
+              : "bg-muted text-foreground/60 hover:bg-accent/10 hover:text-accent"
           }`}
         >
           {filter}

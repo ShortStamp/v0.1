@@ -17,16 +17,16 @@ export default function Toolbox({ slots }: ToolboxProps) {
 
   return (
     <div
-      className={`mt-8 border p-5 transition-colors ${
+      className={`mt-8 rounded-2xl p-5 transition-colors ${
         isComplete
-          ? "border-black bg-black text-white"
-          : "border-border bg-neutral-50"
+          ? "bg-gradient-to-r from-accent to-secondary text-white shadow-lg shadow-accent/20"
+          : "border border-border bg-muted"
       }`}
     >
       <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
         <div
           className={`flex items-center gap-2 text-xs uppercase tracking-[0.1em] ${
-            isComplete ? "text-white" : "text-neutral-400"
+            isComplete ? "text-white/80" : "text-foreground/40"
           }`}
         >
           {isComplete ? (

@@ -16,12 +16,12 @@ export default function ShortStampBadge({
 
   const color =
     score >= 90
-      ? "bg-green-100 text-green-800"
+      ? "bg-pink-50 text-pink-700 ring-1 ring-pink-200"
       : score >= 80
-        ? "bg-emerald-100 text-emerald-800"
+        ? "bg-rose-50 text-rose-600 ring-1 ring-rose-200"
         : score >= 70
-          ? "bg-yellow-100 text-yellow-800"
-          : "bg-red-100 text-red-800";
+          ? "bg-fuchsia-50 text-fuchsia-600 ring-1 ring-fuchsia-200"
+          : "bg-pink-100 text-pink-800 ring-1 ring-pink-300";
 
   const Icon =
     direction === "rising"
