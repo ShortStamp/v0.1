@@ -35,7 +35,7 @@ async def ingest_open_beauty_facts():
         updated = 0
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=60) as client:
                 for term in SEARCH_TERMS:
                     resp = await client.get(
                         BASE_URL,
@@ -44,7 +44,7 @@ async def ingest_open_beauty_facts():
                             "search_simple": 1,
                             "action": "process",
                             "json": 1,
-                            "page_size": 50,
+                            "page_size": 10,
                             "tagtype_0": "categories",
                             "tag_contains_0": "contains",
                             "tag_0": "beauty",
