@@ -5,7 +5,6 @@ bower_components/
 
 # Build output
 dist/
-build/
 out/
 .next/
 .nuxt/
@@ -60,3 +59,4 @@ docker-compose.override.yml
 .temp/
 .tmp/
 *.tsbuildinfo
+next-env.d.ts
