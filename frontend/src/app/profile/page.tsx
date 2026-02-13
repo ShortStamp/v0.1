@@ -1,7 +1,10 @@
 "use client";
 
-import { Upload, Bell, BellOff } from "lucide-react";
-import { useState } from "react";
+import { Upload, Bell, BellOff, Edit } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { BeautyProfile } from "@/types";
+import Link from "next/link";
 
 const styleOptions = [
   "Clean Girl",
@@ -15,8 +18,17 @@ const styleOptions = [
 ];
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(false);
+  const [beautyProfile, setBeautyProfile] = useState<BeautyProfile | null>(null);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("beautyProfile");
+    if (saved) {
+      setBeautyProfile(JSON.parse(saved));
+    }
+  }, []);
 
   const toggleStyle = (style: string) => {
     setSelectedStyles((prev) =>
@@ -24,9 +36,96 @@ export default function ProfilePage() {
     );
   };
 
+  const formatLabel = (key: string, value: string) => {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-8 text-3xl font-bold">Your Profile</h1>
+      <h1 className="mb-8 text-3xl font-bold uppercase tracking-tight">Your Profile</h1>
+
+      {/* Beauty Profile */}
+      {beautyProfile ? (
+        <section className="mb-10">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Beauty Profile</h2>
+            <Link
+              href="/quiz"
+              className="inline-flex items-center gap-2 text-sm font-medium text-neutral-500 hover:text-black"
+            >
+              <Edit className="h-4 w-4" />
+              Retake Quiz
+            </Link>
+          </div>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  Skin Tone
+                </div>
+                <div className="text-sm font-semibold">
+                  {formatLabel("skinTone", beautyProfile.skinTone)}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  Undertone
+                </div>
+                <div className="text-sm font-semibold">
+                  {formatLabel("undertone", beautyProfile.undertone)}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  Skin Type
+                </div>
+                <div className="text-sm font-semibold">
+                  {formatLabel("skinType", beautyProfile.skinType)}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  Coverage
+                </div>
+                <div className="text-sm font-semibold">
+                  {formatLabel("coverage", beautyProfile.coverage)}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  Finish
+                </div>
+                <div className="text-sm font-semibold">
+                  {formatLabel("finish", beautyProfile.finish)}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  Budget
+                </div>
+                <div className="text-sm font-semibold">
+                  {formatLabel("budget", beautyProfile.budget)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="mb-10">
+          <h2 className="mb-4 text-xl font-semibold">Beauty Profile</h2>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-6 text-center">
+            <p className="mb-4 text-sm text-neutral-600">
+              Complete the quiz to get personalized product recommendations.
+            </p>
+            <Link
+              href="/quiz"
+              className="inline-flex items-center gap-2 bg-black px-6 py-3 text-xs font-medium uppercase tracking-[0.15em] text-white transition-opacity hover:opacity-80"
+            >
+              Take the Quiz
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Face upload */}
       <section className="mb-10">
