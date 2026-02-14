@@ -98,9 +98,12 @@ async def list_products(
 
     if filters:
         for key, value in filters.items():
+            values = [v.strip() for v in value.split(",") if v.strip()]
+            if not values:
+                continue
             subq = select(ProductFilterValue.product_id).where(
                 ProductFilterValue.filter_key == key,
-                ProductFilterValue.value == value,
+                ProductFilterValue.value.in_(values),
             )
             query = query.where(Product.id.in_(subq))
             count_query = count_query.where(Product.id.in_(subq))

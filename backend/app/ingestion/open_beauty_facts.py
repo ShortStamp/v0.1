@@ -61,6 +61,12 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"\s+", " ", name.strip().lower())
 
 
+def _clean_brand_name(raw: str) -> str:
+    """OBF often returns comma-separated brand lists. Take the first one."""
+    first = raw.split(",")[0].strip()
+    return first
+
+
 async def _get_or_create_brand(
     db: AsyncSession, raw_name: str, brand_cache: dict[str, int]
 ) -> int | None:
@@ -68,10 +74,11 @@ async def _get_or_create_brand(
 
     Uses an in-memory cache to avoid repeated DB lookups within a single run.
     """
-    if not raw_name or not raw_name.strip():
+    cleaned = _clean_brand_name(raw_name)
+    if not cleaned:
         return None
 
-    normalized = _normalize_name(raw_name)
+    normalized = _normalize_name(cleaned)
     if normalized in brand_cache:
         return brand_cache[normalized]
 
@@ -82,10 +89,12 @@ async def _get_or_create_brand(
     brand = result.scalar_one_or_none()
 
     if not brand:
-        brand = Brand(
-            name=raw_name.strip(),
-            slug=re.sub(r"[^a-z0-9]+", "-", normalized).strip("-"),
-        )
+        slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
+        # Check for slug collision
+        slug_exists = await db.execute(select(Brand).where(Brand.slug == slug))
+        if slug_exists.scalar_one_or_none():
+            slug = slug + "-" + re.sub(r"[^a-z0-9]", "", normalized)[:8]
+        brand = Brand(name=cleaned, slug=slug)
         db.add(brand)
         await db.flush()
 
@@ -195,27 +204,39 @@ async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
                             stats["skipped"] += 1
                             continue
 
-                        brand_id = await _get_or_create_brand(
-                            db, brand_name, brand_cache
-                        )
-                        if brand_id is None:
-                            stats["skipped"] += 1
-                            continue
+                        try:
+                            async with db.begin_nested():
+                                brand_id = await _get_or_create_brand(
+                                    db, brand_name, brand_cache
+                                )
+                                if brand_id is None:
+                                    stats["skipped"] += 1
+                                    continue
 
-                        outcome = await _upsert_product(
-                            db,
-                            barcode=barcode,
-                            name=name,
-                            brand_id=brand_id,
-                            category_key=category_key,
-                            image_url=item.get("image_url"),
-                            description=item.get("generic_name", "").strip() or None,
-                            source_id=barcode,
-                        )
-                        stats[outcome] += 1
+                                outcome = await _upsert_product(
+                                    db,
+                                    barcode=barcode,
+                                    name=name,
+                                    brand_id=brand_id,
+                                    category_key=category_key,
+                                    image_url=item.get("image_url"),
+                                    description=item.get("generic_name", "").strip() or None,
+                                    source_id=barcode,
+                                )
+                                stats[outcome] += 1
+                        except Exception as exc:
+                            logger.debug(
+                                "Skipping product %s: %s", barcode or name[:30], exc
+                            )
+                            stats["skipped"] += 1
 
                     # If fewer results than page_size, no more pages
-                    total = data.get("count", 0)
+                    # OBF may return "count" as either int or numeric string.
+                    raw_total = data.get("count", 0)
+                    try:
+                        total = int(raw_total)
+                    except (TypeError, ValueError):
+                        total = 0
                     if page * page_size >= total:
                         break
 

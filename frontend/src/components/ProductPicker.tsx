@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { CategoryKey, Product, CategoryDefinition } from "@/types";
-import { categoryMap, sampleProducts } from "@/lib/data";
+import { categoryMap } from "@/lib/data";
+import { api } from "@/lib/api";
 import { X, Search, Star, Plus, LayoutGrid, List } from "lucide-react";
 
 type ViewMode = "tiles" | "list";
@@ -18,28 +19,44 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const allProducts = useMemo(
-    () => sampleProducts.filter((p) => p.category === categoryKey),
-    [categoryKey]
-  );
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const filters: Record<string, string> = {};
+        for (const [key, values] of Object.entries(activeFilters)) {
+          if (values.size > 0) {
+            filters[key] = Array.from(values).join(",");
+          }
+        }
+
+        const data = await api.getProducts({
+          category: categoryKey,
+          search: search || undefined,
+          filters,
+          per_page: 100,
+        });
+        setProducts(data.items);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load products";
+        setError(message);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [categoryKey, search, activeFilters]);
 
   const filtered = useMemo(() => {
-    return allProducts.filter((p) => {
-      // search
-      if (search) {
-        const q = search.toLowerCase();
-        if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
-      }
-      // filters
-      for (const [key, values] of Object.entries(activeFilters)) {
-        if (values.size === 0) continue;
-        const pVal = String(p.filters[key] ?? "");
-        if (!values.has(pVal)) return false;
-      }
-      return true;
-    });
-  }, [allProducts, search, activeFilters]);
+    return products;
+  }, [products]);
 
   const toggleFilter = (filterKey: string, value: string) => {
     setActiveFilters((prev) => {
@@ -127,7 +144,11 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
 
         {/* Product list / tiles */}
         <div className="flex-1 overflow-y-auto">
-          {filtered.length > 0 ? (
+          {loading ? (
+            <p className="py-16 text-center text-sm text-foreground/40">Loading products...</p>
+          ) : error ? (
+            <p className="py-16 text-center text-sm text-red-500">{error}</p>
+          ) : filtered.length > 0 ? (
             viewMode === "list" ? (
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted text-left text-xs uppercase tracking-wide text-foreground/50">
@@ -142,8 +163,23 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                   {filtered.map((product) => (
                     <tr key={product.id} className="hover:bg-muted/50">
                       <td className="px-4 py-3">
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-foreground/50">{product.brand}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
+                            <img
+                              src={product.image || "/placeholder-product.jpg"}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder-product.jpg";
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-xs text-foreground/50">{product.brand}</p>
+                          </div>
+                        </div>
                       </td>
                       <td className="hidden px-4 py-3 sm:table-cell">
                         <span className="inline-flex items-center gap-1 text-xs">
@@ -171,12 +207,18 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                 {filtered.map((product) => (
                   <div
                     key={product.id}
-                    className="flex flex-col rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10"
+                    className="flex aspect-[3/5] flex-col rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10"
                   >
-                    <div className="flex h-36 items-center justify-center bg-gradient-to-br from-pink-50 via-muted to-rose-50 rounded-t-2xl">
-                      <span className="text-3xl text-pink-300">
-                        {category.label.charAt(0)}
-                      </span>
+                    <div className="h-44 overflow-hidden rounded-t-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-3">
+                      <img
+                        src={product.image || "/placeholder-product.jpg"}
+                        alt={product.name}
+                        className="h-full w-full object-contain"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder-product.jpg";
+                        }}
+                      />
                     </div>
                     <div className="flex flex-1 flex-col gap-2 p-4">
                       <div className="flex items-start justify-between gap-2">

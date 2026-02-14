@@ -1,20 +1,55 @@
-import { sampleProducts } from "@/lib/data";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { Product } from "@/types";
+import { api } from "@/lib/api";
 import ShortStampBadge from "@/components/ShortStampBadge";
 import PriceComparisonTable from "@/components/PriceComparisonTable";
-import { ArrowLeft, ShoppingBag, Bookmark } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import SaveProductButton from "@/components/SaveProductButton";
 
-interface ProductPageProps {
-  params: Promise<{ id: string }>;
-}
+export default function ProductPage() {
+  const params = useParams<{ id: string }>();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default async function ProductPage({ params }: ProductPageProps) {
-  const { id } = await params;
-  const product = sampleProducts.find((p) => p.id === id);
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!params.id) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await api.getProduct(params.id);
+        setProduct(data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load product";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (!product) return notFound();
+    fetchProduct();
+  }, [params.id]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <p className="text-sm text-foreground/60">Loading product...</p>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <p className="text-sm text-foreground/60">{error || "Product not found."}</p>
+      </div>
+    );
+  }
 
   const sorted = [...product.prices].sort((a, b) => a.price - b.price);
   const lowestPrice = sorted[0]?.price;
@@ -30,19 +65,22 @@ export default async function ProductPage({ params }: ProductPageProps) {
       </Link>
 
       <div className="mb-8 grid gap-8 md:grid-cols-2">
-        {/* Product image placeholder */}
-        <div className="flex h-72 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50">
-          <ShoppingBag className="h-20 w-20 text-pink-300" />
+        <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-6">
+          <img
+            src={product.image || "/placeholder-product.jpg"}
+            alt={product.name}
+            className="h-full w-full object-contain"
+            onError={(e) => {
+              e.currentTarget.src = "/placeholder-product.jpg";
+            }}
+          />
         </div>
 
-        {/* Product info */}
         <div className="flex flex-col gap-3">
           <p className="text-sm text-foreground/50">{product.brand}</p>
           <h1 className="text-2xl font-bold">{product.name}</h1>
           <ShortStampBadge score={product.stampScore} />
-          <p className="text-2xl font-bold text-accent">
-            From ${lowestPrice.toFixed(2)}
-          </p>
+          <p className="text-2xl font-bold text-accent">From ${lowestPrice?.toFixed(2) ?? "0.00"}</p>
           {product.description && (
             <p className="text-sm text-foreground/60">{product.description}</p>
           )}
@@ -57,7 +95,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </ul>
           )}
 
-          {/* Action buttons */}
           <div className="mt-4 flex flex-col gap-3">
             {bestRetailer && (
               <a
@@ -66,7 +103,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 rel="noopener noreferrer"
                 className="inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
               >
-                Buy Now — ${lowestPrice.toFixed(2)} at {bestRetailer.retailer}
+                Buy Now - ${lowestPrice?.toFixed(2) ?? "0.00"} at {bestRetailer.retailer}
               </a>
             )}
             <SaveProductButton productId={product.id} category={product.category} />
@@ -74,17 +111,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </div>
       </div>
 
-      {/* Price comparison */}
       <section className="mb-10">
         <h2 className="mb-4 text-xl font-semibold">Compare Prices</h2>
         <PriceComparisonTable prices={product.prices} />
       </section>
 
-      {/* Price history placeholder */}
       <section>
         <h2 className="mb-4 text-xl font-semibold">Price History</h2>
         <div className="rounded-2xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
-          Price history chart coming soon — track price changes over time.
+          Price history chart coming soon - track price changes over time.
         </div>
       </section>
     </div>
