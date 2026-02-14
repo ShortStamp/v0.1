@@ -1,137 +1,262 @@
+"""Open Beauty Facts product catalog ingestion.
+
+Searches the public OBF API for cosmetics/makeup products, upserting brands and
+products into the local database.  Idempotent: re-running will not create
+duplicates thanks to barcode uniqueness and (brand_id, normalized_name) fallback.
+
+Run manually:
+    python -m app.ingestion.open_beauty_facts
+"""
+
 import logging
+import re
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.ingestion import run_job
+from app.models.product import Brand, Product
+from app.services.obf_client import search_products
 
 import httpx
-from sqlalchemy import select
-
-from app.database import async_session
-from app.models.ingestion import IngestionRun
-from app.models.product import Brand, Product
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://world.openfoodfacts.org/cgi/search.pl"
-
-# Beauty-related categories to search
+# Makeup search terms — covers the 5 face areas (Base, Eyes, Brows, Cheeks, Lips)
 SEARCH_TERMS = [
-    "foundation", "concealer", "primer", "powder", "blush",
-    "bronzer", "highlighter", "eyeshadow", "eyeliner", "mascara",
-    "lipstick", "lip gloss", "lip liner", "setting spray",
+    "foundation", "concealer", "primer", "powder",
+    "blush", "bronzer", "highlighter",
+    "eyeshadow", "eyeliner", "mascara",
+    "lipstick", "lip gloss", "lip liner",
+    "setting spray",
     "brow pencil", "brow gel",
 ]
 
+# Search term -> category_key mapping
+CATEGORY_MAP = {
+    "foundation": "foundation",
+    "concealer": "concealer",
+    "primer": "primer",
+    "powder": "powder",
+    "blush": "blush",
+    "bronzer": "bronzer",
+    "highlighter": "highlighter",
+    "eyeshadow": "eyeshadow",
+    "eyeliner": "eyeliner",
+    "mascara": "mascara",
+    "lipstick": "lipstick",
+    "lip gloss": "lip-gloss",
+    "lip liner": "lip-liner",
+    "setting spray": "setting-spray",
+    "brow pencil": "brow-pencil",
+    "brow gel": "brow-gel",
+}
 
-async def ingest_open_beauty_facts():
-    """Fetch product data from Open Beauty Facts (CC-BY-SA licensed).
 
-    This searches the Open Beauty Facts/Open Products Facts API for cosmetics,
-    creating or updating product records and brand entries.
+def _normalize_name(name: str) -> str:
+    """Lowercase, collapse whitespace, strip."""
+    return re.sub(r"\s+", " ", name.strip().lower())
+
+
+async def _get_or_create_brand(
+    db: AsyncSession, raw_name: str, brand_cache: dict[str, int]
+) -> int | None:
+    """Return brand_id for a given raw brand name, creating if needed.
+
+    Uses an in-memory cache to avoid repeated DB lookups within a single run.
     """
-    async with async_session() as db:
-        run = IngestionRun(source="open_beauty_facts")
-        db.add(run)
+    if not raw_name or not raw_name.strip():
+        return None
+
+    normalized = _normalize_name(raw_name)
+    if normalized in brand_cache:
+        return brand_cache[normalized]
+
+    # Case-insensitive lookup
+    result = await db.execute(
+        select(Brand).where(func.lower(Brand.name) == normalized)
+    )
+    brand = result.scalar_one_or_none()
+
+    if not brand:
+        brand = Brand(
+            name=raw_name.strip(),
+            slug=re.sub(r"[^a-z0-9]+", "-", normalized).strip("-"),
+        )
+        db.add(brand)
         await db.flush()
 
-        added = 0
-        updated = 0
+    brand_cache[normalized] = brand.id
+    return brand.id
 
-        try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                for term in SEARCH_TERMS:
-                    resp = await client.get(
-                        BASE_URL,
-                        params={
-                            "search_terms": term,
-                            "search_simple": 1,
-                            "action": "process",
-                            "json": 1,
-                            "page_size": 10,
-                            "tagtype_0": "categories",
-                            "tag_contains_0": "contains",
-                            "tag_0": "beauty",
-                        },
+
+async def _upsert_product(
+    db: AsyncSession,
+    *,
+    barcode: str | None,
+    name: str,
+    brand_id: int,
+    category_key: str,
+    image_url: str | None,
+    description: str | None,
+    source_id: str | None,
+) -> str:
+    """Upsert a product by barcode (preferred) or (brand_id + normalized name).
+
+    Returns: "created", "updated", or "skipped" (no meaningful change).
+    """
+    now = datetime.now(UTC)
+    existing: Product | None = None
+
+    # Strategy 1: match by barcode
+    if barcode:
+        result = await db.execute(
+            select(Product).where(Product.upc == barcode)
+        )
+        existing = result.scalar_one_or_none()
+
+    # Strategy 2: match by (brand_id + normalized name)
+    if existing is None:
+        norm = _normalize_name(name)
+        result = await db.execute(
+            select(Product).where(
+                Product.brand_id == brand_id,
+                func.lower(Product.name) == norm,
+            )
+        )
+        existing = result.scalar_one_or_none()
+
+    if existing:
+        existing.last_seen_at = now
+        # Fill in barcode if we didn't have it before
+        if barcode and not existing.upc:
+            existing.upc = barcode
+        if image_url and existing.image_url == "/placeholder-product.jpg":
+            existing.image_url = image_url
+        return "updated"
+
+    # Create new product
+    product = Product(
+        name=name.strip(),
+        brand_id=brand_id,
+        category_key=category_key,
+        upc=barcode or None,
+        image_url=image_url or "/placeholder-product.jpg",
+        description=description,
+        source="open_beauty_facts",
+        source_id=source_id,
+        last_seen_at=now,
+    )
+    db.add(product)
+    return "created"
+
+
+async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
+    """Core ingestion logic.  Called by run_job() with a live session."""
+    max_pages = settings.max_pages_per_term
+    page_size = settings.page_size
+
+    stats: dict[str, Any] = {
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "errors": 0,
+        "api_calls": 0,
+        "terms_processed": 0,
+    }
+    term_errors: list[str] = []
+    brand_cache: dict[str, int] = {}
+
+    async with httpx.AsyncClient(
+        timeout=60, headers={"User-Agent": "ShortStamp/1.0"}
+    ) as http_client:
+        for term in SEARCH_TERMS:
+            category_key = CATEGORY_MAP.get(term, "foundation")
+            try:
+                for page in range(1, max_pages + 1):
+                    data = await search_products(
+                        term, page=page, page_size=page_size, client=http_client
                     )
-                    if resp.status_code != 200:
-                        logger.warning(f"OBF search failed for '{term}': {resp.status_code}")
-                        continue
-
-                    data = resp.json()
+                    stats["api_calls"] += 1
                     products = data.get("products", [])
 
+                    if not products:
+                        break
+
                     for item in products:
-                        barcode = item.get("code")
-                        name = item.get("product_name", "").strip()
-                        brand_name = item.get("brands", "").strip()
+                        barcode = item.get("code", "").strip() or None
+                        name = (item.get("product_name") or "").strip()
+                        brand_name = (item.get("brands") or "").strip()
 
-                        if not name or not barcode:
+                        if not name:
+                            stats["skipped"] += 1
                             continue
 
-                        # Check if product exists by barcode
-                        existing = await db.execute(
-                            select(Product).where(Product.upc == barcode)
+                        brand_id = await _get_or_create_brand(
+                            db, brand_name, brand_cache
                         )
-                        if existing.scalar_one_or_none():
-                            updated += 1
+                        if brand_id is None:
+                            stats["skipped"] += 1
                             continue
 
-                        # Get or create brand
-                        brand = None
-                        if brand_name:
-                            result = await db.execute(
-                                select(Brand).where(Brand.name == brand_name)
-                            )
-                            brand = result.scalar_one_or_none()
-                            if not brand:
-                                brand = Brand(
-                                    name=brand_name,
-                                    slug=brand_name.lower().replace(" ", "-"),
-                                )
-                                db.add(brand)
-                                await db.flush()
+                        outcome = await _upsert_product(
+                            db,
+                            barcode=barcode,
+                            name=name,
+                            brand_id=brand_id,
+                            category_key=category_key,
+                            image_url=item.get("image_url"),
+                            description=item.get("generic_name", "").strip() or None,
+                            source_id=barcode,
+                        )
+                        stats[outcome] += 1
 
-                        if brand:
-                            product = Product(
-                                name=name,
-                                brand_id=brand.id,
-                                category_key=_map_category(term),
-                                upc=barcode,
-                                open_beauty_facts_id=barcode,
-                                image_url=item.get("image_url", "/placeholder-product.jpg"),
-                                description=item.get("generic_name", ""),
-                            )
-                            db.add(product)
-                            added += 1
+                    # If fewer results than page_size, no more pages
+                    total = data.get("count", 0)
+                    if page * page_size >= total:
+                        break
 
-            run.status = "completed"
-            run.products_added = added
-            run.products_updated = updated
+                stats["terms_processed"] += 1
 
-        except Exception as e:
-            run.status = "failed"
-            run.error_message = str(e)
-            logger.error(f"Open Beauty Facts ingestion failed: {e}")
+            except Exception as exc:
+                logger.error(
+                    "Error processing term '%s': %s", term, exc, exc_info=True
+                )
+                stats["errors"] += 1
+                term_errors.append(f"{term}: {exc}")
+                # Continue with next term — partial failure is acceptable
 
-        await db.commit()
-        logger.info(f"OBF ingestion: {added} added, {updated} updated")
+    await db.commit()
+
+    if term_errors:
+        stats["term_errors"] = term_errors
+
+    return stats
 
 
-def _map_category(search_term: str) -> str:
-    """Map a search term to the closest category key."""
-    mapping = {
-        "foundation": "foundation",
-        "concealer": "concealer",
-        "primer": "primer",
-        "powder": "powder",
-        "blush": "blush",
-        "bronzer": "bronzer",
-        "highlighter": "highlighter",
-        "eyeshadow": "eyeshadow",
-        "eyeliner": "eyeliner",
-        "mascara": "mascara",
-        "lipstick": "lipstick",
-        "lip gloss": "lip-gloss",
-        "lip liner": "lip-liner",
-        "setting spray": "setting-spray",
-        "brow pencil": "brow-pencil",
-        "brow gel": "brow-gel",
-    }
-    return mapping.get(search_term, "foundation")
+# ---------------------------------------------------------------------------
+# Entrypoints
+# ---------------------------------------------------------------------------
+
+async def run_ingestion() -> None:
+    """Wrapper that runs the job through the standard run_job infrastructure."""
+    await run_job(
+        job_name="obf_ingest",
+        source="open_beauty_facts",
+        job_fn=ingest_open_beauty_facts,
+        parameters={
+            "terms": SEARCH_TERMS,
+            "max_pages_per_term": settings.max_pages_per_term,
+            "page_size": settings.page_size,
+        },
+    )
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(run_ingestion())
