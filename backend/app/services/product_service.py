@@ -1,6 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from urllib.parse import parse_qs, unquote, urlparse
 
 from app.models.product import Brand, Product, ProductFilterValue, ProductPrice, ProductReview
 from app.schemas.product import (
@@ -14,6 +15,49 @@ from app.utils.exceptions import NotFoundError
 from app.utils.pagination import paginate
 
 
+def _get_walmart_url(product: Product) -> str | None:
+    for price in product.prices:
+        if price.source == "walmart" and price.url and price.url != "#":
+            return price.url
+        if price.retailer and "walmart" in price.retailer.name.lower() and price.url and price.url != "#":
+            return price.url
+    if product.walmart_item_id:
+        return f"https://www.walmart.com/ip/{product.walmart_item_id}"
+    return None
+
+
+def _normalize_walmart_url(url: str | None) -> str:
+    if not url:
+        return "#"
+
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+
+    # Walmart affiliate tracking links often include the real destination in `u=...`.
+    if "goto.walmart.com" in host:
+        query = parse_qs(parsed.query)
+        target = (query.get("u") or [None])[0]
+        if target:
+            decoded = unquote(target)
+            target_parsed = urlparse(decoded)
+            if "walmart." in target_parsed.netloc.lower():
+                return decoded
+        return "#"
+
+    if "walmart." in host:
+        return url
+
+    return "#"
+
+
+def _retailer_name(price: ProductPrice) -> str:
+    if price.retailer and price.retailer.name:
+        return price.retailer.name
+    if price.source:
+        return price.source.title()
+    return "Unknown"
+
+
 def _product_to_list_item(product: Product) -> ProductListItem:
     return ProductListItem(
         id=product.id,
@@ -24,9 +68,9 @@ def _product_to_list_item(product: Product) -> ProductListItem:
         stamp_score=product.stamp_score,
         prices=[
             RetailerPriceSchema(
-                retailer=p.retailer.name,
+                retailer=_retailer_name(p),
                 price=p.price,
-                url=p.url,
+                url=_normalize_walmart_url(p.url) if p.source == "walmart" else p.url,
                 in_stock=p.in_stock,
             )
             for p in product.prices
@@ -47,9 +91,9 @@ def _product_to_detail(product: Product) -> ProductDetail:
         specs=product.specs,
         prices=[
             RetailerPriceSchema(
-                retailer=p.retailer.name,
+                retailer=_retailer_name(p),
                 price=p.price,
-                url=p.url,
+                url=_normalize_walmart_url(p.url) if p.source == "walmart" else p.url,
                 in_stock=p.in_stock,
             )
             for p in product.prices
@@ -59,6 +103,7 @@ def _product_to_detail(product: Product) -> ProductDetail:
             for r in product.reviews
         ],
         filters={fv.filter_key: fv.value for fv in product.filter_values},
+        walmart_url=_get_walmart_url(product),
     )
 
 
@@ -98,9 +143,21 @@ async def list_products(
 
     if filters:
         for key, value in filters.items():
+            values = [v.strip() for v in value.split(",") if v.strip()]
+            if not values:
+                continue
+            if key == "brand":
+                lowered = [v.lower() for v in values]
+                query = query.where(
+                    Product.brand.has(func.lower(Brand.name).in_(lowered))
+                )
+                count_query = count_query.where(
+                    Product.brand.has(func.lower(Brand.name).in_(lowered))
+                )
+                continue
             subq = select(ProductFilterValue.product_id).where(
                 ProductFilterValue.filter_key == key,
-                ProductFilterValue.value == value,
+                ProductFilterValue.value.in_(values),
             )
             query = query.where(Product.id.in_(subq))
             count_query = count_query.where(Product.id.in_(subq))
@@ -159,10 +216,24 @@ async def get_product_prices(db: AsyncSession, product_id: str) -> list[Retailer
         raise NotFoundError("Product not found")
     return [
         RetailerPriceSchema(
-            retailer=p.retailer.name,
+            retailer=_retailer_name(p),
             price=p.price,
-            url=p.url,
+            url=_normalize_walmart_url(p.url) if p.source == "walmart" else p.url,
             in_stock=p.in_stock,
         )
         for p in product.prices
     ]
+
+
+async def list_brands(db: AsyncSession, category: str | None = None) -> list[str]:
+    query = (
+        select(func.distinct(Brand.name))
+        .join(Product, Product.brand_id == Brand.id)
+        .where(Product.is_active == True)  # noqa: E712
+        .order_by(func.lower(Brand.name))
+    )
+    if category:
+        query = query.where(Product.category_key == category)
+
+    result = await db.execute(query)
+    return [name for name in result.scalars().all() if name]

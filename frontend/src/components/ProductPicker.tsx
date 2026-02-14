@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { CategoryKey, Product, CategoryDefinition } from "@/types";
-import { categoryMap, sampleProducts } from "@/lib/data";
+import { categoryMap } from "@/lib/data";
+import { api } from "@/lib/api";
+import { getQuizAutoFilters } from "@/lib/personalization";
 import { X, Search, Star, Plus, LayoutGrid, List } from "lucide-react";
 
 type ViewMode = "tiles" | "list";
@@ -18,28 +20,89 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const allProducts = useMemo(
-    () => sampleProducts.filter((p) => p.category === categoryKey),
-    [categoryKey]
-  );
+  useEffect(() => {
+    const defaults = getQuizAutoFilters(category);
+    if (Object.keys(defaults).length === 0) return;
+    setActiveFilters((prev) => (Object.keys(prev).length > 0 ? prev : defaults));
+  }, [category]);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const filters: Record<string, string> = {};
+        for (const [key, values] of Object.entries(activeFilters)) {
+          if (values.size > 0) {
+            filters[key] = Array.from(values).join(",");
+          }
+        }
+
+        const data = await api.getProducts({
+          category: categoryKey,
+          search: search || undefined,
+          filters,
+          per_page: 100,
+        });
+        setProducts(data.items);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load products";
+        setError(message);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [categoryKey, search, activeFilters]);
+
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const brands = await api.getProductBrands(categoryKey);
+        if (brands.length > 0) {
+          setBrandOptions(brands);
+          return;
+        }
+      } catch {
+        // Fallback below if endpoint is unavailable.
+      }
+
+      try {
+        const data = await api.getProducts({
+          category: categoryKey,
+          per_page: 100,
+        });
+        const derived = Array.from(new Set(data.items.map((p) => p.brand))).sort((a, b) =>
+          a.localeCompare(b)
+        );
+        setBrandOptions(derived);
+      } catch {
+        setBrandOptions([]);
+      }
+    };
+    fetchBrands();
+  }, [categoryKey]);
 
   const filtered = useMemo(() => {
-    return allProducts.filter((p) => {
-      // search
-      if (search) {
-        const q = search.toLowerCase();
-        if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
-      }
-      // filters
-      for (const [key, values] of Object.entries(activeFilters)) {
-        if (values.size === 0) continue;
-        const pVal = String(p.filters[key] ?? "");
-        if (!values.has(pVal)) return false;
-      }
-      return true;
+    return products;
+  }, [products]);
+
+  const displayedFilters = useMemo(() => {
+    return category.filters.map((filter) => {
+      if (filter.key !== "brand" || filter.type !== "checkbox") return filter;
+      return {
+        ...filter,
+        options: brandOptions.length > 0 ? brandOptions : filter.options,
+      };
     });
-  }, [allProducts, search, activeFilters]);
+  }, [category.filters, brandOptions]);
 
   const toggleFilter = (filterKey: string, value: string) => {
     setActiveFilters((prev) => {
@@ -98,7 +161,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
       <div className="flex flex-1 overflow-hidden">
         {/* Filter sidebar */}
         <aside className="hidden w-64 shrink-0 overflow-y-auto border-r border-border p-4 md:block">
-          {category.filters
+          {displayedFilters
             .filter((f) => f.type === "checkbox" && f.options && f.options.length > 0)
             .map((filter) => (
               <div key={filter.key} className="mb-5">
@@ -127,7 +190,11 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
 
         {/* Product list / tiles */}
         <div className="flex-1 overflow-y-auto">
-          {filtered.length > 0 ? (
+          {loading ? (
+            <p className="py-16 text-center text-sm text-foreground/40">Loading products...</p>
+          ) : error ? (
+            <p className="py-16 text-center text-sm text-red-500">{error}</p>
+          ) : filtered.length > 0 ? (
             viewMode === "list" ? (
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted text-left text-xs uppercase tracking-wide text-foreground/50">
@@ -142,8 +209,23 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                   {filtered.map((product) => (
                     <tr key={product.id} className="hover:bg-muted/50">
                       <td className="px-4 py-3">
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-foreground/50">{product.brand}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
+                            <img
+                              src={product.image || "/placeholder-product.jpg"}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder-product.jpg";
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-xs text-foreground/50">{product.brand}</p>
+                          </div>
+                        </div>
                       </td>
                       <td className="hidden px-4 py-3 sm:table-cell">
                         <span className="inline-flex items-center gap-1 text-xs">
@@ -167,36 +249,42 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                 </tbody>
               </table>
             ) : (
-              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {filtered.map((product) => (
                   <div
                     key={product.id}
-                    className="flex flex-col rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10"
+                    className="flex aspect-[3/5] flex-col rounded-xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10"
                   >
-                    <div className="flex h-36 items-center justify-center bg-gradient-to-br from-pink-50 via-muted to-rose-50 rounded-t-2xl">
-                      <span className="text-3xl text-pink-300">
-                        {category.label.charAt(0)}
-                      </span>
+                    <div className="h-[74%] overflow-hidden rounded-t-xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-1.5">
+                      <img
+                        src={product.image || "/placeholder-product.jpg"}
+                        alt={product.name}
+                        className="h-full w-full object-contain"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder-product.jpg";
+                        }}
+                      />
                     </div>
-                    <div className="flex flex-1 flex-col gap-2 p-4">
+                    <div className="flex flex-1 flex-col gap-1 p-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-xs text-foreground/50">{product.brand}</p>
-                          <h3 className="text-sm font-semibold leading-tight">{product.name}</h3>
+                          <p className="text-[10px] text-foreground/50">{product.brand}</p>
+                          <h3 className="text-[11px] font-semibold leading-tight">{product.name}</h3>
                         </div>
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-pink-50 px-2 py-0.5 text-xs font-medium text-pink-600">
-                          <Star className="h-3 w-3 fill-pink-400 text-pink-400" />
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-pink-50 px-1.5 py-0.5 text-[10px] font-medium text-pink-600">
+                          <Star className="h-2.5 w-2.5 fill-pink-400 text-pink-400" />
                           {product.stampScore}
                         </span>
                       </div>
-                      <p className="mt-auto text-lg font-bold text-accent">
+                      <p className="mt-auto text-sm font-bold text-accent">
                         ${lowestPrice(product).toFixed(2)}
                       </p>
                       <button
                         onClick={() => onSelect(product)}
-                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-3 py-2 text-sm font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
+                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-2 py-1.5 text-[11px] font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
                       >
-                        <Plus className="h-4 w-4" /> Add
+                        <Plus className="h-3 w-3" /> Add
                       </button>
                     </div>
                   </div>

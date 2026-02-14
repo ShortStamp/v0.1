@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { CategoryKey } from "@/types";
-import { sampleProducts } from "@/lib/data";
 
 interface SaveProductButtonProps {
   productId: string;
@@ -22,10 +21,6 @@ export default function SaveProductButton({ productId, category }: SaveProductBu
 
   const handleSave = () => {
     const slots = JSON.parse(sessionStorage.getItem("buildSlots") || "{}");
-    const product = sampleProducts.find((p) => p.id === productId);
-    if (!product) return;
-
-    // Save product ID to the matching category slot
     slots[category] = productId;
     sessionStorage.setItem("buildSlots", JSON.stringify(slots));
     setSaved(true);

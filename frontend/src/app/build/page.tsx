@@ -117,6 +117,17 @@ export default function BuildPage() {
                 </div>
                 {slot.product ? (
                   <div>
+                    <div className="mb-3 h-28 overflow-hidden rounded-lg bg-muted">
+                      <img
+                        src={slot.product.image || "/placeholder-product.jpg"}
+                        alt={slot.product.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder-product.jpg";
+                        }}
+                      />
+                    </div>
                     <div className="mb-1 text-sm font-semibold">{slot.product.name}</div>
                     <div className="mb-3 text-xs text-foreground/50">{slot.product.brand}</div>
                     {best && (
