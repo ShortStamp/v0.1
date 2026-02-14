@@ -48,6 +48,7 @@ export interface Product {
   description?: string;
   specs?: string[];
   reviews?: Review[];
+  walmartUrl?: string;
   filters: Record<string, string | boolean | number>;
 }
 

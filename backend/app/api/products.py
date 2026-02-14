@@ -60,6 +60,14 @@ async def list_products(
     )
 
 
+@router.get("/brands", response_model=list[str])
+async def list_product_brands(
+    category: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    return await product_service.list_brands(db, category=category)
+
+
 @router.get("/{product_id}", response_model=ProductDetail)
 async def get_product(product_id: str, db: AsyncSession = Depends(get_db)):
     return await product_service.get_product(db, product_id)

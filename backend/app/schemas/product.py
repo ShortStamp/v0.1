@@ -35,6 +35,7 @@ class ProductDetail(ProductListItem):
     description: str | None = None
     specs: list[str] | None = None
     reviews: list[ReviewSchema] = []
+    walmart_url: str | None = None
 
 
 class PaginatedProducts(BaseModel):

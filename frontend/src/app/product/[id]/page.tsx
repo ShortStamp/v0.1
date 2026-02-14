@@ -54,6 +54,8 @@ export default function ProductPage() {
   const sorted = [...product.prices].sort((a, b) => a.price - b.price);
   const lowestPrice = sorted[0]?.price;
   const bestRetailer = sorted[0];
+  const walmartRetailer = product.prices.find((p) => p.retailer.toLowerCase().includes("walmart"));
+  const walmartUrl = product.walmartUrl || walmartRetailer?.url;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -104,6 +106,16 @@ export default function ProductPage() {
                 className="inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
               >
                 Buy Now - ${lowestPrice?.toFixed(2) ?? "0.00"} at {bestRetailer.retailer}
+              </a>
+            )}
+            {walmartUrl && (
+              <a
+                href={walmartUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 border border-border px-6 py-3 text-sm font-semibold text-foreground transition-all hover:border-accent hover:text-accent"
+              >
+                View on Walmart
               </a>
             )}
             <SaveProductButton productId={product.id} category={product.category} />

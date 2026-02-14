@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { CategoryKey, Product, CategoryDefinition, ToolboxSlot } from "@/types";
 import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
+import { getQuizAutoFilters } from "@/lib/personalization";
 import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check } from "lucide-react";
 
 type ViewMode = "tiles" | "list";
@@ -16,9 +17,17 @@ export default function CategoryPage() {
   const category: CategoryDefinition | undefined = categoryMap[categoryKey];
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
+
+  useEffect(() => {
+    if (!category) return;
+    const defaults = getQuizAutoFilters(category);
+    if (Object.keys(defaults).length === 0) return;
+    setActiveFilters((prev) => (Object.keys(prev).length > 0 ? prev : defaults));
+  }, [category]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -40,9 +49,49 @@ export default function CategoryPage() {
     fetchProducts();
   }, [categoryKey, search, activeFilters]);
 
+  useEffect(() => {
+    const fetchBrands = async () => {
+      if (!categoryKey) return;
+      try {
+        const brands = await api.getProductBrands(categoryKey);
+        if (brands.length > 0) {
+          setBrandOptions(brands);
+          return;
+        }
+      } catch {
+        // Fallback below if endpoint is unavailable.
+      }
+
+      try {
+        const data = await api.getProducts({
+          category: categoryKey,
+          per_page: 100,
+        });
+        const derived = Array.from(new Set(data.items.map((p) => p.brand))).sort((a, b) =>
+          a.localeCompare(b)
+        );
+        setBrandOptions(derived);
+      } catch {
+        setBrandOptions([]);
+      }
+    };
+    fetchBrands();
+  }, [categoryKey]);
+
   const filtered = useMemo(() => {
     return products;
   }, [products]);
+
+  const displayedFilters = useMemo(() => {
+    if (!category) return [];
+    return category.filters.map((filter) => {
+      if (filter.key !== "brand" || filter.type !== "checkbox") return filter;
+      return {
+        ...filter,
+        options: brandOptions.length > 0 ? brandOptions : filter.options,
+      };
+    });
+  }, [category, brandOptions]);
 
   const toggleFilter = (filterKey: string, value: string) => {
     setActiveFilters((prev) => {
@@ -138,7 +187,7 @@ export default function CategoryPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Filter sidebar */}
         <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-border p-5 md:block">
-          {category.filters
+          {displayedFilters
             .filter((f) => f.type === "checkbox" && f.options && f.options.length > 0)
             .map((filter) => (
               <div key={filter.key} className="mb-6">
@@ -231,19 +280,19 @@ export default function CategoryPage() {
                 </tbody>
               </table>
             ) : (
-              <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {filtered.map((product) => {
                   const isCurrentlySelected = currentProduct?.id === product.id;
                   return (
                     <div
                       key={product.id}
-                      className={`flex aspect-[3/5] flex-col rounded-2xl border transition-all hover:shadow-md hover:shadow-accent/10 ${
+                      className={`flex aspect-[3/5] flex-col rounded-xl border transition-all hover:shadow-md hover:shadow-accent/10 ${
                         isCurrentlySelected
                           ? "border-accent bg-accent/5"
                           : "border-border bg-white"
                       }`}
                     >
-                      <div className="h-44 overflow-hidden rounded-t-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-3">
+                      <div className="h-[74%] overflow-hidden rounded-t-xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-1.5">
                         <img
                           src={product.image || "/placeholder-product.jpg"}
                           alt={product.name}
@@ -254,32 +303,32 @@ export default function CategoryPage() {
                           }}
                         />
                       </div>
-                      <div className="flex flex-1 flex-col gap-2 p-4">
+                      <div className="flex flex-1 flex-col gap-1 p-2">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-foreground/40">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-foreground/40">
                               {product.brand}
                             </p>
-                            <h3 className="text-sm font-medium leading-tight">{product.name}</h3>
+                            <h3 className="text-[11px] font-medium leading-tight">{product.name}</h3>
                           </div>
-                          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-pink-500">
-                            <Star className="h-3 w-3 fill-pink-400 text-pink-400" />
+                          <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-pink-500">
+                            <Star className="h-2.5 w-2.5 fill-pink-400 text-pink-400" />
                             {product.stampScore}
                           </span>
                         </div>
-                        <p className="mt-auto text-lg font-bold text-accent">
+                        <p className="mt-auto text-sm font-bold text-accent">
                           ${lowestPrice(product).toFixed(2)}
                         </p>
                         {isCurrentlySelected ? (
-                          <span className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full border border-accent px-3 py-2 text-[10px] font-medium uppercase tracking-[0.1em] text-accent">
-                            <Check className="h-3.5 w-3.5" /> Selected
+                          <span className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full border border-accent px-2 py-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-accent">
+                            <Check className="h-3 w-3" /> Selected
                           </span>
                         ) : (
                           <button
                             onClick={() => selectProduct(product)}
-                            className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-3 py-3 text-[10px] font-medium uppercase tracking-[0.1em] text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
+                            className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-2 py-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
                           >
-                            <Plus className="h-3.5 w-3.5" /> Add
+                            <Plus className="h-3 w-3" /> Add
                           </button>
                         )}
                       </div>

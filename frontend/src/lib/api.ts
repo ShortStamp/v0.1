@@ -188,6 +188,13 @@ class ApiClient {
     return mapProduct(data);
   }
 
+  async getProductBrands(category?: string): Promise<string[]> {
+    const searchParams = new URLSearchParams();
+    if (category) searchParams.set("category", category);
+    const query = searchParams.toString();
+    return this.fetch(`/products/brands${query ? `?${query}` : ""}`);
+  }
+
   async getProductPrices(id: string): Promise<RetailerPrice[]> {
     return this.fetch(`/products/${id}/prices`);
   }
@@ -296,6 +303,7 @@ function mapProduct(data: any): Product {
     description: data.description,
     specs: data.specs,
     reviews: data.reviews,
+    walmartUrl: data.walmart_url,
     filters: data.filters || {},
   };
 }
