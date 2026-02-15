@@ -6,7 +6,7 @@ import { CategoryKey, Product, CategoryDefinition, ToolboxSlot } from "@/types";
 import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
 import { getQuizAutoFilters } from "@/lib/personalization";
-import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check } from "lucide-react";
+import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2 } from "lucide-react";
 
 type ViewMode = "tiles" | "list";
 
@@ -17,6 +17,7 @@ export default function CategoryPage() {
   const category: CategoryDefinition | undefined = categoryMap[categoryKey];
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [brandOptions, setBrandOptions] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
@@ -31,19 +32,38 @@ export default function CategoryPage() {
 
   useEffect(() => {
     const fetchProducts = async () => {
-      if (categoryKey) {
+      if (!categoryKey) return;
+      setLoading(true);
+      try {
         const filters: Record<string, string> = {};
         for (const [key, values] of Object.entries(activeFilters)) {
           if (values.size > 0) {
             filters[key] = Array.from(values).join(",");
           }
         }
-        const paginatedProducts = await api.getProducts({
+        let data = await api.getProducts({
           category: categoryKey,
           search: search || undefined,
-          filters: filters,
+          filters,
+          per_page: 100,
         });
-        setProducts(paginatedProducts.items);
+        // If filters returned nothing, retry without non-brand filters
+        // (products may lack filter metadata from data source)
+        if (data.items.length === 0 && Object.keys(filters).some((k) => k !== "brand")) {
+          const brandOnly: Record<string, string> = {};
+          if (filters.brand) brandOnly.brand = filters.brand;
+          data = await api.getProducts({
+            category: categoryKey,
+            search: search || undefined,
+            filters: brandOnly,
+            per_page: 100,
+          });
+        }
+        setProducts(data.items);
+      } catch {
+        setProducts([]);
+      } finally {
+        setLoading(false);
       }
     };
     fetchProducts();
@@ -216,7 +236,12 @@ export default function CategoryPage() {
 
         {/* Product list / tiles */}
         <div className="flex-1 overflow-y-auto">
-          {filtered.length > 0 ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-32">
+              <Loader2 className="h-8 w-8 animate-spin text-foreground/30" />
+              <p className="mt-4 text-sm text-foreground/40">Loading products...</p>
+            </div>
+          ) : filtered.length > 0 ? (
             viewMode === "list" ? (
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted text-left text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40">
