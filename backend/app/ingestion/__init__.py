@@ -21,6 +21,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session
 from app.models.ingestion import IngestionLock, IngestionRun
 
+# Import all models so SQLAlchemy can resolve ForeignKey references (e.g. products.category_key -> categories.key)
+import app.models.category  # noqa: F401
+import app.models.product  # noqa: F401
+import app.models.user  # noqa: F401
+import app.models.build  # noqa: F401
+import app.models.trend  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 LOCK_TIMEOUT = timedelta(hours=2)
