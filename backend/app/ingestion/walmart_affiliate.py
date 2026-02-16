@@ -134,7 +134,11 @@ async def ingest_walmart_prices(db: AsyncSession) -> dict[str, Any]:
     )
     matched_products = result2.all()
 
-    async with WalmartClient(settings.walmart_api_key, settings.walmart_private_key_path) as wm:
+    async with WalmartClient(
+        settings.walmart_api_key,
+        private_key_path=settings.walmart_private_key_path,
+        private_key_pem=settings.walmart_private_key_pem,
+    ) as wm:
         # --- Stage 1: Barcode lookup for unmatched products ---
         for row in unmatched:
             product = row[0]
@@ -243,8 +247,9 @@ async def ingest_walmart_prices(db: AsyncSession) -> dict[str, Any]:
 
 async def run_ingestion() -> None:
     """Wrapper that runs the job through the standard run_job infrastructure."""
-    if not settings.walmart_api_key or not settings.walmart_private_key_path:
-        logger.warning("WALMART_API_KEY or WALMART_PRIVATE_KEY_PATH not configured")
+    has_key = settings.walmart_private_key_path or settings.walmart_private_key_pem
+    if not settings.walmart_api_key or not has_key:
+        logger.warning("WALMART_API_KEY or private key not configured")
         await run_job(
             job_name="walmart_prices",
             source="walmart",

@@ -227,9 +227,10 @@ async def get_product_prices(db: AsyncSession, product_id: str) -> list[Retailer
 
 async def list_brands(db: AsyncSession, category: str | None = None) -> list[str]:
     query = (
-        select(func.distinct(Brand.name))
+        select(Brand.name)
         .join(Product, Product.brand_id == Brand.id)
         .where(Product.is_active == True)  # noqa: E712
+        .group_by(Brand.name)
         .order_by(func.lower(Brand.name))
     )
     if category:

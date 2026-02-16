@@ -33,9 +33,14 @@ MAX_RETRIES = 3
 REQUEST_TIMEOUT = 30
 
 
-def _load_private_key(path: str) -> RSAPrivateKey:
-    """Load an RSA private key from a PEM file."""
-    pem_data = Path(path).read_bytes()
+def _load_private_key(path: str = "", pem_content: str = "") -> RSAPrivateKey:
+    """Load an RSA private key from a PEM file or raw PEM string."""
+    if pem_content:
+        pem_data = pem_content.encode("utf-8")
+    elif path:
+        pem_data = Path(path).read_bytes()
+    else:
+        raise ValueError("Either path or pem_content must be provided")
     key = serialization.load_pem_private_key(pem_data, password=None)
     if not isinstance(key, RSAPrivateKey):
         raise TypeError(f"Expected RSA private key, got {type(key).__name__}")
@@ -83,9 +88,9 @@ class WalmartAPIError(Exception):
 class WalmartClient:
     """Async client for Walmart Affiliate Marketing API with RSA signing."""
 
-    def __init__(self, consumer_id: str, private_key_path: str):
+    def __init__(self, consumer_id: str, private_key_path: str = "", private_key_pem: str = ""):
         self._consumer_id = consumer_id
-        self._private_key = _load_private_key(private_key_path)
+        self._private_key = _load_private_key(path=private_key_path, pem_content=private_key_pem)
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self):

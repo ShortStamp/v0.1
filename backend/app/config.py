@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Ingestion pipeline
     walmart_api_key: str = ""
     walmart_private_key_path: str = ""
+    walmart_private_key_pem: str = ""  # PEM key content as env var (alternative to file)
     enable_scheduler: bool = False
     max_pages_per_term: int = 5
     page_size: int = 50

@@ -6,7 +6,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://world.openfoodfacts.org/cgi/search.pl"
+BASE_URL = "https://world.openbeautyfacts.org/cgi/search.pl"
 
 # User-Agent required by OBF policy
 USER_AGENT = "ShortStamp/1.0 (ingestion; contact@shortstamp.com)"
@@ -37,9 +37,6 @@ async def search_products(
         "json": 1,
         "page": page,
         "page_size": min(page_size, 100),
-        "tagtype_0": "categories",
-        "tag_contains_0": "contains",
-        "tag_0": "beauty",
     }
 
     should_close = client is None
