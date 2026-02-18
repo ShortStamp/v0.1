@@ -7,6 +7,8 @@ import { BeautyProfile, ToolboxSlot, CategoryKey, Product } from "@/types";
 import Toolbox from "@/components/Toolbox";
 import ProductPicker from "@/components/ProductPicker";
 import { categoryMap } from "@/lib/data";
+import { api } from "@/lib/api";
+import { readBuildSlots, saveBuildSlot, removeBuildSlot } from "@/lib/buildSlots";
 import { ExternalLink, X, Eye } from "lucide-react";
 
 const mainCategories: CategoryKey[] = [
@@ -27,19 +29,49 @@ export default function BuildPage() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("beautyProfile");
+    const saved = localStorage.getItem("beautyProfile");
     if (!saved) {
-      // No profile yet, redirect to quiz
-      router.push("/quiz");
+      router.push("/build/quiz");
+      return;
+    }
+    setProfile(JSON.parse(saved));
+
+    // Restore saved slots from localStorage
+    const savedSlots = readBuildSlots();
+
+    // Build initial slots, then hydrate saved products
+    const initialSlots: ToolboxSlot[] = mainCategories.map((category) => ({
+      category,
+      product: null,
+    }));
+
+    // Fetch saved product data before showing the page
+    const entries = Object.entries(savedSlots).filter(
+      ([cat]) => mainCategories.includes(cat as CategoryKey)
+    );
+    if (entries.length > 0) {
+      Promise.all(
+        entries.map(async ([cat, productId]) => {
+          try {
+            const product = await api.getProduct(productId);
+            return { category: cat as CategoryKey, product };
+          } catch {
+            return null;
+          }
+        })
+      ).then((results) => {
+        setSlots(
+          initialSlots.map((slot) => {
+            const match = results.find(
+              (r) => r && r.category === slot.category
+            );
+            return match ? { ...slot, product: match.product } : slot;
+          })
+        );
+        setLoading(false);
+      });
     } else {
-      setProfile(JSON.parse(saved));
-      // Initialize empty slots
-      setSlots(
-        mainCategories.map((category) => ({
-          category,
-          product: null,
-        }))
-      );
+      setSlots(initialSlots);
       setLoading(false);
     }
   }, [router]);
@@ -49,6 +81,9 @@ export default function BuildPage() {
   };
 
   const handleProductSelected = (product: Product) => {
+    if (selectedCategory) {
+      saveBuildSlot(selectedCategory, product.id);
+    }
     setSlots((prev) =>
       prev.map((slot) =>
         slot.category === selectedCategory ? { ...slot, product } : slot
@@ -58,6 +93,7 @@ export default function BuildPage() {
   };
 
   const handleRemoveProduct = (category: CategoryKey) => {
+    removeBuildSlot(category);
     setSlots((prev) =>
       prev.map((slot) =>
         slot.category === category ? { ...slot, product: null } : slot

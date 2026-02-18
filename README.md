@@ -2,6 +2,19 @@
 
 This project is a web application that allows users to discover makeup trends, build their own looks, and compare prices across different retailers.
 
+## One-command local dev
+
+Run frontend + backend together (with ingestion scheduler enabled):
+
+```bash
+./dev.sh
+```
+
+This starts:
+- Frontend on `http://localhost:3000`
+- Backend on `http://localhost:8000`
+- Ingestion scheduler in the backend process (`ENABLE_SCHEDULER=true`)
+
 ## Frontend
 
 The frontend is a Next.js application. To run it, you need to have Node.js and npm installed.

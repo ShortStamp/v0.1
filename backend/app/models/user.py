@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, gen_uuid
@@ -8,13 +8,18 @@ from app.models.base import Base, TimestampMixin, gen_uuid
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("oauth_provider", "oauth_id", name="uq_user_oauth"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(200))
+    password_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    oauth_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    oauth_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     beauty_profile: Mapped["BeautyProfile | None"] = relationship(
         back_populates="user", uselist=False

@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from app.models.product import Brand, Product, ProductFilterValue, ProductPrice, ProductReview
 from app.schemas.product import (
+    FilterPropertiesResponse,
     PaginatedProducts,
     ProductDetail,
     ProductListItem,
@@ -107,6 +108,55 @@ def _product_to_detail(product: Product) -> ProductDetail:
     )
 
 
+def _apply_category_and_search_filters(
+    query,
+    count_query,
+    category: str | None = None,
+    search: str | None = None,
+):
+    if category:
+        query = query.where(Product.category_key == category)
+        count_query = count_query.where(Product.category_key == category)
+
+    if search:
+        pattern = f"%{search}%"
+        query = query.join(Brand).where(
+            Product.name.ilike(pattern) | Brand.name.ilike(pattern)
+        )
+        count_query = count_query.join(Brand).where(
+            Product.name.ilike(pattern) | Brand.name.ilike(pattern)
+        )
+
+    return query, count_query
+
+
+def _apply_attribute_filters(query, count_query, filters: dict[str, str] | None = None):
+    if not filters:
+        return query, count_query
+
+    for key, value in filters.items():
+        values = [v.strip() for v in value.split(",") if v.strip()]
+        if not values:
+            continue
+        if key == "brand":
+            lowered = [v.lower() for v in values]
+            query = query.where(
+                Product.brand.has(func.lower(Brand.name).in_(lowered))
+            )
+            count_query = count_query.where(
+                Product.brand.has(func.lower(Brand.name).in_(lowered))
+            )
+            continue
+        subq = select(ProductFilterValue.product_id).where(
+            ProductFilterValue.filter_key == key,
+            ProductFilterValue.value.in_(values),
+        )
+        query = query.where(Product.id.in_(subq))
+        count_query = count_query.where(Product.id.in_(subq))
+
+    return query, count_query
+
+
 async def list_products(
     db: AsyncSession,
     category: str | None = None,
@@ -128,39 +178,10 @@ async def list_products(
 
     count_query = select(func.count(Product.id)).where(Product.is_active == True)  # noqa: E712
 
-    if category:
-        query = query.where(Product.category_key == category)
-        count_query = count_query.where(Product.category_key == category)
-
-    if search:
-        pattern = f"%{search}%"
-        query = query.join(Brand).where(
-            Product.name.ilike(pattern) | Brand.name.ilike(pattern)
-        )
-        count_query = count_query.join(Brand).where(
-            Product.name.ilike(pattern) | Brand.name.ilike(pattern)
-        )
-
-    if filters:
-        for key, value in filters.items():
-            values = [v.strip() for v in value.split(",") if v.strip()]
-            if not values:
-                continue
-            if key == "brand":
-                lowered = [v.lower() for v in values]
-                query = query.where(
-                    Product.brand.has(func.lower(Brand.name).in_(lowered))
-                )
-                count_query = count_query.where(
-                    Product.brand.has(func.lower(Brand.name).in_(lowered))
-                )
-                continue
-            subq = select(ProductFilterValue.product_id).where(
-                ProductFilterValue.filter_key == key,
-                ProductFilterValue.value.in_(values),
-            )
-            query = query.where(Product.id.in_(subq))
-            count_query = count_query.where(Product.id.in_(subq))
+    query, count_query = _apply_category_and_search_filters(
+        query, count_query, category=category, search=search
+    )
+    query, count_query = _apply_attribute_filters(query, count_query, filters=filters)
 
     if sort == "stamp_score_desc":
         query = query.order_by(Product.stamp_score.desc())
@@ -184,6 +205,71 @@ async def list_products(
 
     items = [_product_to_list_item(p) for p in products]
     return PaginatedProducts(items=items, **paginate(total, page, per_page))
+
+
+async def list_filter_properties(
+    db: AsyncSession,
+    category: str | None = None,
+    search: str | None = None,
+    filters: dict[str, str] | None = None,
+) -> FilterPropertiesResponse:
+    product_ids_query = select(Product.id).where(Product.is_active == True)  # noqa: E712
+    product_ids_query, _ = _apply_category_and_search_filters(
+        product_ids_query, product_ids_query, category=category, search=search
+    )
+    product_ids_query, _ = _apply_attribute_filters(
+        product_ids_query, product_ids_query, filters=filters
+    )
+
+    product_ids_subquery = product_ids_query.subquery()
+    product_ids = select(product_ids_subquery.c.id)
+
+    filter_rows = await db.execute(
+        select(
+            ProductFilterValue.filter_key,
+            ProductFilterValue.value,
+            func.count(func.distinct(ProductFilterValue.product_id)).label("count"),
+        )
+        .where(ProductFilterValue.product_id.in_(product_ids))
+        .group_by(ProductFilterValue.filter_key, ProductFilterValue.value)
+        .order_by(
+            ProductFilterValue.filter_key.asc(),
+            func.lower(ProductFilterValue.value).asc(),
+        )
+    )
+
+    brand_rows = await db.execute(
+        select(
+            Brand.name,
+            func.count(func.distinct(Product.id)).label("count"),
+        )
+        .select_from(Product)
+        .join(Brand, Product.brand_id == Brand.id)
+        .where(Product.id.in_(product_ids))
+        .group_by(Brand.name)
+        .order_by(func.lower(Brand.name).asc())
+    )
+
+    grouped: dict[str, list[str]] = {}
+    counts: dict[str, dict[str, int]] = {}
+
+    for key, value, count in filter_rows:
+        grouped.setdefault(key, []).append(value)
+        counts.setdefault(key, {})[value] = int(count or 0)
+
+    brand_names: list[str] = []
+    brand_counts: dict[str, int] = {}
+    for brand_name, count in brand_rows:
+        if not brand_name:
+            continue
+        brand_names.append(brand_name)
+        brand_counts[brand_name] = int(count or 0)
+
+    if brand_names:
+        grouped["brand"] = brand_names
+        counts["brand"] = brand_counts
+
+    return FilterPropertiesResponse(filters=grouped, counts=counts)
 
 
 async def get_product(db: AsyncSession, product_id: str) -> ProductDetail:

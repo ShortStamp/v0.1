@@ -46,6 +46,11 @@ class PaginatedProducts(BaseModel):
     pages: int
 
 
+class FilterPropertiesResponse(BaseModel):
+    filters: dict[str, list[str]] = {}
+    counts: dict[str, dict[str, int]] = {}
+
+
 class PriceHistoryEntry(BaseModel):
     retailer: str
     price: float

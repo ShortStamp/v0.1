@@ -16,8 +16,7 @@ function findMatchingOption(options: string[] | undefined, candidates: string[])
 
 function getStoredBeautyProfile(): Partial<BeautyProfile> | null {
   if (typeof window === "undefined") return null;
-  const raw =
-    sessionStorage.getItem("beautyProfile") || localStorage.getItem("beautyProfile");
+  const raw = localStorage.getItem("beautyProfile");
   if (!raw) return null;
   try {
     return JSON.parse(raw) as Partial<BeautyProfile>;

@@ -24,7 +24,7 @@ export default function ProfilePage() {
   const [beautyProfile, setBeautyProfile] = useState<BeautyProfile | null>(null);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("beautyProfile");
+    const saved = localStorage.getItem("beautyProfile");
     if (saved) {
       setBeautyProfile(JSON.parse(saved));
     }

@@ -4,17 +4,30 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
-const navLinks = [
+const baseLinks = [
   { href: "/", label: "HOME" },
   { href: "/build", label: "BUILD" },
   { href: "/trends", label: "TRENDS" },
-  { href: "/profile", label: "PROFILE" },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
+
+  const navLinks = [
+    ...baseLinks,
+    isAuthenticated
+      ? { href: "/profile", label: "PROFILE" }
+      : { href: "/build/quiz", label: "LOG IN" },
+  ];
+
+  const handleLogout = async () => {
+    await logout();
+    setMobileOpen(false);
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-white/80 backdrop-blur-md">
@@ -27,7 +40,7 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden gap-8 md:flex">
+        <div className="hidden items-center gap-8 md:flex">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -41,6 +54,14 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-accent"
+            >
+              LOG OUT
+            </button>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -70,6 +91,14 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="block w-full py-3 text-left text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-accent"
+            >
+              LOG OUT
+            </button>
+          )}
         </div>
       )}
     </nav>
