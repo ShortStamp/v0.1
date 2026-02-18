@@ -17,6 +17,11 @@ interface PaginatedProducts {
   pages: number;
 }
 
+interface ProductFilterPropertiesResponse {
+  filters: Record<string, string[]>;
+  counts: Record<string, Record<string, number>>;
+}
+
 interface AuthResponse {
   user: { id: string; email: string; display_name: string | null };
   access_token: string;
@@ -125,6 +130,24 @@ class ApiClient {
     return data;
   }
 
+  async oauthGoogle(idToken: string): Promise<AuthResponse> {
+    const data = await this.fetch<AuthResponse>("/auth/oauth/google", {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken }),
+    });
+    this.setTokens(data.access_token, data.refresh_token);
+    return data;
+  }
+
+  async oauthApple(idToken: string, user?: object): Promise<AuthResponse> {
+    const data = await this.fetch<AuthResponse>("/auth/oauth/apple", {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken, user: user || null }),
+    });
+    this.setTokens(data.access_token, data.refresh_token);
+    return data;
+  }
+
   async logout(): Promise<void> {
     try {
       await this.fetch("/auth/logout", { method: "POST" });
@@ -197,6 +220,22 @@ class ApiClient {
 
   async getProductPrices(id: string): Promise<RetailerPrice[]> {
     return this.fetch(`/products/${id}/prices`);
+  }
+
+  async getProductFilterProperties(params: {
+    category?: string;
+    search?: string;
+    filters?: Record<string, string>;
+  }): Promise<ProductFilterPropertiesResponse> {
+    const searchParams = new URLSearchParams();
+    if (params.category) searchParams.set("category", params.category);
+    if (params.search) searchParams.set("search", params.search);
+    if (params.filters) {
+      for (const [key, value] of Object.entries(params.filters)) {
+        searchParams.set(`filters[${key}]`, value);
+      }
+    }
+    return this.fetch(`/products/filter-properties?${searchParams}`);
   }
 
   // ---- Trends ----

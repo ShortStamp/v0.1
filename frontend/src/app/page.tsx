@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { TrendingUp, Search, ArrowRight, Palette } from "lucide-react";
+import { TrendingUp, Search, Palette } from "lucide-react";
 import TrendCard from "@/components/TrendCard";
+import StartBuildingButton from "@/components/StartBuildingButton";
 import { sampleTrends } from "@/lib/data";
 
 export default function Home() {
@@ -25,12 +26,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col items-center gap-4 pt-2">
-            <Link
-              href="/quiz"
-              className="inline-flex items-center gap-2 rounded-full bg-accent px-10 py-3.5 text-xs font-medium uppercase tracking-[0.15em] text-white shadow-lg shadow-accent/25 transition-all hover:shadow-xl hover:shadow-accent/30 hover:brightness-110"
-            >
-              Start Building <ArrowRight className="h-4 w-4" />
-            </Link>
+            <StartBuildingButton />
             <Link
               href="/trends"
               className="text-xs font-medium uppercase tracking-[0.1em] text-foreground/40 underline underline-offset-4 hover:text-accent"

@@ -36,3 +36,12 @@ class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+class GoogleOAuthRequest(BaseModel):
+    id_token: str
+
+
+class AppleOAuthRequest(BaseModel):
+    id_token: str
+    user: dict | None = None

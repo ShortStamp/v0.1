@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CategoryKey, Product, CategoryDefinition, ToolboxSlot } from "@/types";
+import { CategoryKey, Product, CategoryDefinition } from "@/types";
 import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
+import { readBuildSlots, saveBuildSlot } from "@/lib/buildSlots";
 import { getQuizAutoFilters } from "@/lib/personalization";
 import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2 } from "lucide-react";
 
@@ -18,7 +19,7 @@ export default function CategoryPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [filterOptionsByKey, setFilterOptionsByKey] = useState<Record<string, string[]>>({});
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
@@ -70,32 +71,18 @@ export default function CategoryPage() {
   }, [categoryKey, search, activeFilters]);
 
   useEffect(() => {
-    const fetchBrands = async () => {
+    const fetchFilterOptions = async () => {
       if (!categoryKey) return;
       try {
-        const brands = await api.getProductBrands(categoryKey);
-        if (brands.length > 0) {
-          setBrandOptions(brands);
-          return;
-        }
-      } catch {
-        // Fallback below if endpoint is unavailable.
-      }
-
-      try {
-        const data = await api.getProducts({
+        const data = await api.getProductFilterProperties({
           category: categoryKey,
-          per_page: 100,
         });
-        const derived = Array.from(new Set(data.items.map((p) => p.brand))).sort((a, b) =>
-          a.localeCompare(b)
-        );
-        setBrandOptions(derived);
+        setFilterOptionsByKey(data.filters || {});
       } catch {
-        setBrandOptions([]);
+        setFilterOptionsByKey({});
       }
     };
-    fetchBrands();
+    fetchFilterOptions();
   }, [categoryKey]);
 
   const filtered = useMemo(() => {
@@ -105,13 +92,14 @@ export default function CategoryPage() {
   const displayedFilters = useMemo(() => {
     if (!category) return [];
     return category.filters.map((filter) => {
-      if (filter.key !== "brand" || filter.type !== "checkbox") return filter;
+      const options = filterOptionsByKey[filter.key];
+      if (!options || options.length === 0) return filter;
       return {
         ...filter,
-        options: brandOptions.length > 0 ? brandOptions : filter.options,
+        options,
       };
     });
-  }, [category, brandOptions]);
+  }, [category, filterOptionsByKey]);
 
   const toggleFilter = (filterKey: string, value: string) => {
     setActiveFilters((prev) => {
@@ -127,25 +115,13 @@ export default function CategoryPage() {
   const lowestPrice = (p: Product) =>
     p.prices.length > 0 ? Math.min(...p.prices.map((r) => r.price)) : 0;
 
-  const currentSlots: ToolboxSlot[] = (() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem("buildSlots");
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+  const currentProductId: string | null = (() => {
+    const slots = readBuildSlots();
+    return slots[categoryKey] || null;
   })();
-  const currentProduct = currentSlots.find((s) => s.category === categoryKey)?.product;
 
   const selectProduct = (product: Product) => {
-    const raw = localStorage.getItem("buildSlots");
-    const slots: ToolboxSlot[] = raw ? JSON.parse(raw) : [];
-    const exists = slots.some((s) => s.category === categoryKey);
-    const updated = exists
-      ? slots.map((s) => (s.category === categoryKey ? { ...s, product } : s))
-      : [...slots, { category: categoryKey, product }];
-    localStorage.setItem("buildSlots", JSON.stringify(updated));
+    saveBuildSlot(categoryKey, product.id);
     router.push("/build");
   };
 
@@ -254,7 +230,7 @@ export default function CategoryPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.map((product) => {
-                    const isCurrentlySelected = currentProduct?.id === product.id;
+                    const isCurrentlySelected = currentProductId === product.id;
                     return (
                       <tr key={product.id} className="hover:bg-muted/50">
                         <td className="px-5 py-4">
@@ -307,7 +283,7 @@ export default function CategoryPage() {
             ) : (
               <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {filtered.map((product) => {
-                  const isCurrentlySelected = currentProduct?.id === product.id;
+                  const isCurrentlySelected = currentProductId === product.id;
                   return (
                     <div
                       key={product.id}

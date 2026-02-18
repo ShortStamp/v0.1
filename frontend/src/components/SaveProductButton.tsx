@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { CategoryKey } from "@/types";
+import { readBuildSlots, saveBuildSlot } from "@/lib/buildSlots";
 
 interface SaveProductButtonProps {
   productId: string;
@@ -15,14 +16,12 @@ export default function SaveProductButton({ productId, category }: SaveProductBu
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const slots = JSON.parse(sessionStorage.getItem("buildSlots") || "{}");
+    const slots = readBuildSlots();
     setSaved(slots[category] === productId);
   }, [productId, category]);
 
   const handleSave = () => {
-    const slots = JSON.parse(sessionStorage.getItem("buildSlots") || "{}");
-    slots[category] = productId;
-    sessionStorage.setItem("buildSlots", JSON.stringify(slots));
+    saveBuildSlot(category, productId);
     setSaved(true);
   };
 

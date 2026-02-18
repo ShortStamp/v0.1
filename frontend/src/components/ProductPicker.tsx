@@ -21,7 +21,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
   const [products, setProducts] = useState<Product[]>([]);
-  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [filterOptionsByKey, setFilterOptionsByKey] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,31 +63,15 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
   }, [categoryKey, search, activeFilters]);
 
   useEffect(() => {
-    const fetchBrands = async () => {
+    const fetchFilterOptions = async () => {
       try {
-        const brands = await api.getProductBrands(categoryKey);
-        if (brands.length > 0) {
-          setBrandOptions(brands);
-          return;
-        }
+        const data = await api.getProductFilterProperties({ category: categoryKey });
+        setFilterOptionsByKey(data.filters || {});
       } catch {
-        // Fallback below if endpoint is unavailable.
-      }
-
-      try {
-        const data = await api.getProducts({
-          category: categoryKey,
-          per_page: 100,
-        });
-        const derived = Array.from(new Set(data.items.map((p) => p.brand))).sort((a, b) =>
-          a.localeCompare(b)
-        );
-        setBrandOptions(derived);
-      } catch {
-        setBrandOptions([]);
+        setFilterOptionsByKey({});
       }
     };
-    fetchBrands();
+    fetchFilterOptions();
   }, [categoryKey]);
 
   const filtered = useMemo(() => {
@@ -96,13 +80,14 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
 
   const displayedFilters = useMemo(() => {
     return category.filters.map((filter) => {
-      if (filter.key !== "brand" || filter.type !== "checkbox") return filter;
+      const options = filterOptionsByKey[filter.key];
+      if (!options || options.length === 0) return filter;
       return {
         ...filter,
-        options: brandOptions.length > 0 ? brandOptions : filter.options,
+        options,
       };
     });
-  }, [category.filters, brandOptions]);
+  }, [category.filters, filterOptionsByKey]);
 
   const toggleFilter = (filterKey: string, value: string) => {
     setActiveFilters((prev) => {
