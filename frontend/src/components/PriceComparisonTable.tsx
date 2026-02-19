@@ -10,7 +10,7 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
   const lowestPrice = sorted[0]?.price;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border">
+    <div className="overflow-hidden border border-border">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-muted">
@@ -27,28 +27,28 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
               <td className="px-4 py-3">
                 <span
                   className={
-                    item.price === lowestPrice ? "font-bold text-green-600" : ""
+                    item.price === lowestPrice ? "font-bold text-foreground" : ""
                   }
                 >
                   ${item.price.toFixed(2)}
                 </span>
                 {item.price === lowestPrice && (
-                  <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                  <span className="ml-2 bg-foreground px-2 py-0.5 text-xs font-medium text-background">
                     Best
                   </span>
                 )}
               </td>
               <td className="px-4 py-3 text-center">
                 {item.inStock ? (
-                  <Check className="mx-auto h-4 w-4 text-green-600" />
+                  <Check className="mx-auto h-4 w-4 text-foreground" />
                 ) : (
-                  <X className="mx-auto h-4 w-4 text-red-400" />
+                  <X className="mx-auto h-4 w-4 text-foreground/30" />
                 )}
               </td>
               <td className="px-4 py-3 text-right">
                 <a
                   href={item.url}
-                  className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
+                  className="inline-flex items-center gap-1 bg-foreground px-4 py-1.5 text-xs font-medium text-background transition-all hover:opacity-80"
                 >
                   Buy <ExternalLink className="h-3 w-3" />
                 </a>

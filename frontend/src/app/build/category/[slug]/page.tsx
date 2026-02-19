@@ -23,11 +23,13 @@ export default function CategoryPage() {
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
+  const [hasQuizFilters, setHasQuizFilters] = useState(false);
 
   useEffect(() => {
     if (!category) return;
     const defaults = getQuizAutoFilters(category);
     if (Object.keys(defaults).length === 0) return;
+    setHasQuizFilters(true);
     setActiveFilters((prev) => (Object.keys(prev).length > 0 ? prev : defaults));
   }, [category]);
 
@@ -139,7 +141,7 @@ export default function CategoryPage() {
       <div className="flex items-center gap-4 border-b border-border px-6 py-4">
         <button
           onClick={() => router.back()}
-          className="rounded-xl p-3 transition-colors hover:bg-muted hover:text-accent"
+          className="p-3 transition-colors hover:bg-muted"
           aria-label="Go back"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -149,9 +151,18 @@ export default function CategoryPage() {
         </h1>
       </div>
 
+      {/* Personalization banner */}
+      {hasQuizFilters && (
+        <div className="border-b border-border bg-muted px-6 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/50">
+            Matched for you — filtered based on your beauty profile
+          </p>
+        </div>
+      )}
+
       {/* Search bar + view toggle */}
       <div className="flex items-center gap-3 border-b border-border px-6 py-3">
-        <div className="flex flex-1 items-center gap-2 rounded-full border border-border px-4 py-2">
+        <div className="flex flex-1 items-center gap-2 border border-border px-4 py-2">
           <Search className="h-4 w-4 text-foreground/30" />
           <input
             type="text"
@@ -161,17 +172,17 @@ export default function CategoryPage() {
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground/30"
           />
         </div>
-        <div className="flex rounded-full border border-border overflow-hidden">
+        <div className="flex border border-border overflow-hidden">
           <button
             onClick={() => setViewMode("tiles")}
-            className={`p-2 ${viewMode === "tiles" ? "bg-accent text-white" : "text-foreground/40 hover:bg-muted"}`}
+            className={`p-2 ${viewMode === "tiles" ? "bg-foreground text-white" : "text-foreground/40 hover:bg-muted"}`}
             aria-label="Tile view"
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
           <button
             onClick={() => setViewMode("list")}
-            className={`p-2 ${viewMode === "list" ? "bg-accent text-white" : "text-foreground/40 hover:bg-muted"}`}
+            className={`p-2 ${viewMode === "list" ? "bg-foreground text-white" : "text-foreground/40 hover:bg-muted"}`}
             aria-label="List view"
           >
             <List className="h-4 w-4" />
@@ -254,7 +265,7 @@ export default function CategoryPage() {
                         </td>
                         <td className="hidden px-5 py-4 sm:table-cell">
                           <span className="inline-flex items-center gap-1 text-xs">
-                            <Star className="h-3.5 w-3.5 fill-pink-400 text-pink-400" />
+                            <Star className="h-3.5 w-3.5 fill-foreground/60 text-foreground/60" />
                             {product.stampScore}
                           </span>
                         </td>
@@ -263,13 +274,13 @@ export default function CategoryPage() {
                         </td>
                         <td className="px-5 py-4 text-right">
                           {isCurrentlySelected ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-accent px-3 py-2 text-[10px] font-medium uppercase tracking-[0.1em] text-accent">
+                            <span className="inline-flex items-center gap-1 border border-foreground px-3 py-2 text-[10px] font-medium uppercase tracking-[0.1em] text-foreground">
                               <Check className="h-3.5 w-3.5" /> Selected
                             </span>
                           ) : (
                             <button
                               onClick={() => selectProduct(product)}
-                              className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
+                              className="inline-flex items-center gap-1 bg-foreground px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white transition-all hover:shadow-md hover:shadow-black/10"
                             >
                               <Plus className="h-3.5 w-3.5" /> Add
                             </button>
@@ -287,13 +298,13 @@ export default function CategoryPage() {
                   return (
                     <div
                       key={product.id}
-                      className={`flex aspect-[3/5] flex-col rounded-xl border transition-all hover:shadow-md hover:shadow-accent/10 ${
+                      className={`flex aspect-[3/5] flex-col border transition-all duration-200 hover:shadow-md hover:shadow-black/5 ${
                         isCurrentlySelected
-                          ? "border-accent bg-accent/5"
+                          ? "border-foreground bg-muted"
                           : "border-border bg-white"
                       }`}
                     >
-                      <div className="h-[74%] overflow-hidden rounded-t-xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-1.5">
+                      <div className="h-[74%] overflow-hidden bg-muted p-1.5">
                         <img
                           src={product.image || "/placeholder-product.jpg"}
                           alt={product.name}
@@ -312,22 +323,22 @@ export default function CategoryPage() {
                             </p>
                             <h3 className="text-[11px] font-medium leading-tight">{product.name}</h3>
                           </div>
-                          <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-pink-500">
-                            <Star className="h-2.5 w-2.5 fill-pink-400 text-pink-400" />
+                          <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-foreground/60">
+                            <Star className="h-2.5 w-2.5 fill-foreground/60 text-foreground/60" />
                             {product.stampScore}
                           </span>
                         </div>
-                        <p className="mt-auto text-sm font-bold text-accent">
+                        <p className="mt-auto text-sm font-bold text-foreground">
                           ${lowestPrice(product).toFixed(2)}
                         </p>
                         {isCurrentlySelected ? (
-                          <span className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full border border-accent px-2 py-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-accent">
+                          <span className="mt-1 inline-flex w-full items-center justify-center gap-1 border border-foreground px-2 py-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-foreground">
                             <Check className="h-3 w-3" /> Selected
                           </span>
                         ) : (
                           <button
                             onClick={() => selectProduct(product)}
-                            className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-2 py-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
+                            className="mt-1 inline-flex w-full items-center justify-center gap-1 bg-foreground px-2 py-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-white transition-all hover:shadow-md hover:shadow-black/10"
                           >
                             <Plus className="h-3 w-3" /> Add
                           </button>

@@ -13,9 +13,9 @@ export default function ProductCard({ product, onSelect, selectable }: ProductCa
   const lowestPrice = Math.min(...product.prices.map((p) => p.price));
 
   const content = (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
-      <div className="flex h-48 items-center justify-center bg-gradient-to-br from-pink-50 via-muted to-rose-50">
-        <ShoppingBag className="h-12 w-12 text-pink-300" />
+    <div className="group flex flex-col overflow-hidden border border-border bg-background transition-all hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5">
+      <div className="flex h-48 items-center justify-center bg-muted">
+        <ShoppingBag className="h-12 w-12 text-foreground/20" />
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
@@ -25,7 +25,7 @@ export default function ProductCard({ product, onSelect, selectable }: ProductCa
           </div>
           <ShortStampBadge score={product.stampScore} size="sm" />
         </div>
-        <p className="mt-auto text-lg font-bold text-accent">
+        <p className="mt-auto text-lg font-bold text-foreground">
           From ${lowestPrice.toFixed(2)}
         </p>
       </div>

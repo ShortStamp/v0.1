@@ -3,6 +3,13 @@ from pydantic import BaseModel
 from app.schemas.product import ProductListItem
 
 
+class TrendVideoSchema(BaseModel):
+    title: str | None = None
+    url: str
+
+    model_config = {"from_attributes": True}
+
+
 class TrendArticleSchema(BaseModel):
     title: str
     url: str
@@ -23,5 +30,5 @@ class TrendListItem(BaseModel):
 
 class TrendDetail(TrendListItem):
     products: list[ProductListItem] = []
-    videos: list[str] = []
+    videos: list[TrendVideoSchema] = []
     articles: list[TrendArticleSchema] = []

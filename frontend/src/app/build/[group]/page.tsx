@@ -121,7 +121,7 @@ export default function GroupPage() {
       <div className="mb-10 flex items-center gap-4">
         <button
           onClick={() => router.push("/build")}
-          className="rounded-xl p-2 transition-colors hover:bg-muted hover:text-accent"
+          className="p-2 transition-colors hover:bg-muted"
           aria-label="Back to build"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -144,15 +144,15 @@ export default function GroupPage() {
           return (
             <div
               key={catKey}
-              className={`relative flex aspect-[3/5] flex-col items-center rounded-2xl border px-3 pb-4 pt-6 text-center transition-all ${
+              className={`relative flex aspect-[3/5] flex-col items-center border px-3 pb-4 pt-6 text-center transition-all duration-200 ${
                 filled
-                  ? "border-accent bg-accent/5"
-                  : "border-border bg-white hover:border-accent hover:shadow-md hover:shadow-accent/10"
+                  ? "border-foreground bg-muted"
+                  : "border-border bg-white hover:border-foreground hover:shadow-md hover:shadow-black/5"
               }`}
             >
               {/* Icon / Product image */}
               {filled ? (
-                <div className="mb-4 h-20 w-full overflow-hidden rounded-xl bg-muted">
+                <div className="mb-4 h-20 w-full overflow-hidden bg-muted">
                   <img
                     src={slot.product!.image || "/placeholder-product.jpg"}
                     alt={slot.product!.name}
@@ -164,7 +164,7 @@ export default function GroupPage() {
                   />
                 </div>
               ) : (
-                <Icon className="mb-4 h-6 w-6 text-pink-200" />
+                <Icon className="mb-4 h-6 w-6 text-foreground/20" />
               )}
 
               {/* Category label */}
@@ -176,13 +176,13 @@ export default function GroupPage() {
                 <>
                   <p className="text-xs text-foreground/40">{slot.product!.brand}</p>
                   <p className="text-sm font-medium leading-snug">{slot.product!.name}</p>
-                  <p className="mt-auto pt-2 text-base font-bold text-accent">
+                  <p className="mt-auto pt-2 text-base font-bold text-foreground">
                     ${lowestPrice(slot.product!).toFixed(2)}
                   </p>
 
                   <button
                     onClick={() => handleRemove(catKey)}
-                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-pink-100 text-pink-400 shadow-sm transition-colors hover:bg-accent hover:text-white"
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center bg-foreground text-white shadow-sm transition-colors hover:bg-foreground/80"
                     aria-label={`Remove ${slot.product!.name}`}
                   >
                     <XIcon className="h-3.5 w-3.5" />
@@ -191,11 +191,11 @@ export default function GroupPage() {
               ) : (
                 <>
                   <div className="flex flex-1 items-center justify-center">
-                    <span className="text-sm text-pink-200">&mdash;</span>
+                    <span className="text-sm text-foreground/20">&mdash;</span>
                   </div>
                   <Link
                     href={`/build/category/${catKey}`}
-                    className="mt-auto inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-3 py-3 text-[10px] font-medium uppercase tracking-[0.1em] text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
+                    className="mt-auto inline-flex w-full items-center justify-center gap-1 bg-foreground px-3 py-3 text-[10px] font-medium uppercase tracking-[0.1em] text-white transition-all hover:shadow-md hover:shadow-black/10"
                   >
                     <Plus className="h-3 w-3" /> Choose
                   </Link>

@@ -3,10 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from urllib.parse import parse_qs, unquote, urlparse
 
-from app.models.product import Brand, Product, ProductFilterValue, ProductPrice, ProductReview
+from app.models.product import Brand, PriceHistory, Product, ProductFilterValue, ProductPrice, ProductReview, Retailer
 from app.schemas.product import (
     FilterPropertiesResponse,
     PaginatedProducts,
+    PriceHistoryEntry,
     ProductDetail,
     ProductListItem,
     RetailerPriceSchema,
@@ -324,3 +325,25 @@ async def list_brands(db: AsyncSession, category: str | None = None) -> list[str
 
     result = await db.execute(query)
     return [name for name in result.scalars().all() if name]
+
+
+async def get_price_history(
+    db: AsyncSession,
+    product_id: str,
+) -> list[PriceHistoryEntry]:
+    result = await db.execute(
+        select(PriceHistory, Retailer.name.label("retailer_name"))
+        .join(Retailer, PriceHistory.retailer_id == Retailer.id)
+        .where(PriceHistory.product_id == product_id)
+        .order_by(PriceHistory.recorded_at.asc())
+    )
+    rows = result.all()
+    return [
+        PriceHistoryEntry(
+            retailer=row.retailer_name or "Unknown",
+            price=row.PriceHistory.price,
+            in_stock=row.PriceHistory.in_stock,
+            recorded_at=row.PriceHistory.recorded_at.isoformat() if row.PriceHistory.recorded_at else "",
+        )
+        for row in rows
+    ]

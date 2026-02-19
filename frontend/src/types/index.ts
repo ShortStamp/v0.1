@@ -73,7 +73,7 @@ export interface Trend {
   description: string;
   direction: "rising" | "stable" | "declining";
   products: Product[];
-  videos?: string[];
+  videos?: { title: string; url: string }[];
   articles?: { title: string; url: string }[];
 }
 
