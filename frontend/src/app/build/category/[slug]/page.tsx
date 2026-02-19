@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { readBuildSlots, saveBuildSlot } from "@/lib/buildSlots";
 import { getQuizAutoFilters } from "@/lib/personalization";
 import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2 } from "lucide-react";
+import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 
 type ViewMode = "tiles" | "list";
 
@@ -112,8 +113,7 @@ export default function CategoryPage() {
     });
   };
 
-  const lowestPrice = (p: Product) =>
-    p.prices.length > 0 ? Math.min(...p.prices.map((r) => r.price)) : 0;
+  const lowestPrice = (p: Product) => getBestOfferForProduct(p)?.price ?? 0;
 
   const currentProductId: string | null = (() => {
     const slots = readBuildSlots();
@@ -238,7 +238,7 @@ export default function CategoryPage() {
                             <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
                               <img
                                 src={product.image || "/placeholder-product.jpg"}
-                                alt={product.name}
+                                alt={getDisplayName(product.name)}
                                 className="h-full w-full object-cover"
                                 loading="lazy"
                                 onError={(e) => {
@@ -247,8 +247,8 @@ export default function CategoryPage() {
                               />
                             </div>
                             <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-xs text-foreground/40">{product.brand}</p>
+                              <p className="font-medium">{getDisplayName(product.name)}</p>
+                              <p className="text-xs text-foreground/40">{getDisplayBrand(product.brand)}</p>
                             </div>
                           </div>
                         </td>
@@ -259,7 +259,7 @@ export default function CategoryPage() {
                           </span>
                         </td>
                         <td className="px-5 py-4 text-right font-bold">
-                          ${lowestPrice(product).toFixed(2)}
+                          {formatPrice(lowestPrice(product))}
                         </td>
                         <td className="px-5 py-4 text-right">
                           {isCurrentlySelected ? (
@@ -296,7 +296,7 @@ export default function CategoryPage() {
                       <div className="h-[74%] overflow-hidden rounded-t-xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-1.5">
                         <img
                           src={product.image || "/placeholder-product.jpg"}
-                          alt={product.name}
+                          alt={getDisplayName(product.name)}
                           className="h-full w-full object-contain"
                           loading="lazy"
                           onError={(e) => {
@@ -308,9 +308,9 @@ export default function CategoryPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-foreground/40">
-                              {product.brand}
+                              {getDisplayBrand(product.brand)}
                             </p>
-                            <h3 className="text-[11px] font-medium leading-tight">{product.name}</h3>
+                            <h3 className="text-[11px] font-medium leading-tight">{getDisplayName(product.name)}</h3>
                           </div>
                           <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-pink-500">
                             <Star className="h-2.5 w-2.5 fill-pink-400 text-pink-400" />
@@ -318,7 +318,7 @@ export default function CategoryPage() {
                           </span>
                         </div>
                         <p className="mt-auto text-sm font-bold text-accent">
-                          ${lowestPrice(product).toFixed(2)}
+                          {formatPrice(lowestPrice(product))}
                         </p>
                         {isCurrentlySelected ? (
                           <span className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full border border-accent px-2 py-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-accent">

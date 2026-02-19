@@ -9,6 +9,7 @@ import PriceComparisonTable from "@/components/PriceComparisonTable";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import SaveProductButton from "@/components/SaveProductButton";
+import { formatPrice, getBestOffer, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 
 export default function ProductPage() {
   const params = useParams<{ id: string }>();
@@ -51,9 +52,7 @@ export default function ProductPage() {
     );
   }
 
-  const sorted = [...product.prices].sort((a, b) => a.price - b.price);
-  const lowestPrice = sorted[0]?.price;
-  const bestRetailer = sorted[0];
+  const bestRetailer = getBestOffer(product.prices);
   const walmartRetailer = product.prices.find((p) => p.retailer.toLowerCase().includes("walmart"));
   const walmartUrl = product.walmartUrl || walmartRetailer?.url;
 
@@ -70,7 +69,7 @@ export default function ProductPage() {
         <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-6">
           <img
             src={product.image || "/placeholder-product.jpg"}
-            alt={product.name}
+            alt={getDisplayName(product.name)}
             className="h-full w-full object-contain"
             onError={(e) => {
               e.currentTarget.src = "/placeholder-product.jpg";
@@ -79,10 +78,10 @@ export default function ProductPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-foreground/50">{product.brand}</p>
-          <h1 className="text-2xl font-bold">{product.name}</h1>
+          <p className="text-sm text-foreground/50">{getDisplayBrand(product.brand)}</p>
+          <h1 className="text-2xl font-bold">{getDisplayName(product.name)}</h1>
           <ShortStampBadge score={product.stampScore} />
-          <p className="text-2xl font-bold text-accent">From ${lowestPrice?.toFixed(2) ?? "0.00"}</p>
+          <p className="text-2xl font-bold text-accent">{formatPrice(bestRetailer?.price)}</p>
           {product.description && (
             <p className="text-sm text-foreground/60">{product.description}</p>
           )}
@@ -105,7 +104,7 @@ export default function ProductPage() {
                 rel="noopener noreferrer"
                 className="inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
               >
-                Buy Now - ${lowestPrice?.toFixed(2) ?? "0.00"} at {bestRetailer.retailer}
+                Buy Now - {formatPrice(bestRetailer.price)} at {bestRetailer.retailer}
               </a>
             )}
             {walmartUrl && (

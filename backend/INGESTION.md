@@ -1,12 +1,13 @@
 # Ingestion System
 
-The ingestion pipeline populates and maintains the ShortStamp product catalog. It pulls product data from Open Beauty Facts (public API), enriches pricing from the Walmart Affiliate Marketing API, and recalculates StampScores on a schedule.
+The ingestion pipeline populates and maintains the ShortStamp product catalog. It pulls product data from Open Beauty Facts (public API), scrapes retailer sites (Amazon, Sephora, Ulta) for product/link discovery, enriches pricing from the Walmart Affiliate Marketing API, and recalculates StampScores on a schedule.
 
 ## Architecture
 
 ```
 APScheduler (UTC)
 ├── Open Beauty Facts   daily @ 02:00      catalog seeding
+├── Retailer Scraping   every 12 hours      amazon/sephora/ulta product + link discovery
 ├── Walmart Prices      every 6 hours       price enrichment
 └── Score Recalculation every 6 hours       StampScore refresh
 ```
@@ -30,6 +31,7 @@ python -m app.seed            # optional: seed sample data
 
 ```bash
 python -m app.ingestion.open_beauty_facts   # seed from Open Beauty Facts
+python -m app.ingestion.retailer_scrape     # scrape Amazon/Sephora/Ulta product links
 python -m app.ingestion.walmart_affiliate   # enrich prices from Walmart
 python -m app.ingestion.score_calculator    # recalculate StampScores
 ```
@@ -58,6 +60,10 @@ net regardless.
 | `DATABASE_URL` | Yes | sqlite (dev only) | PostgreSQL async URL |
 | `WALMART_API_KEY` | For pricing | `""` | Walmart Affiliate Marketing API key |
 | `ENABLE_SCHEDULER` | No | `false` | Start APScheduler on server boot |
+| `ENABLE_RETAILER_SCRAPER` | No | `false` | Enable retailer website scraping job |
+| `RETAILER_SCRAPE_MAX_PAGES_PER_TERM` | No | `1` | Pages fetched per term per retailer |
+| `RETAILER_SCRAPE_TERMS` | No | `""` | Optional comma-separated term override |
+| `RETAILER_SCRAPE_DETAIL_ENRICH_PER_RETAILER` | No | `25` | Product detail pages fetched per retailer to enrich brand/image/price |
 | `MAX_PAGES_PER_TERM` | No | `5` | OBF pages to fetch per search term |
 | `PAGE_SIZE` | No | `50` | OBF results per page (max 100) |
 
@@ -90,6 +96,20 @@ CC-BY-SA license. We set a `User-Agent` header per their usage policy.
    - Updates `last_seen_at` on every encounter
 4. Partial failure: if one term errors, remaining terms still run
 5. Stats recorded: created, updated, skipped, errors, api_calls
+
+### Retailer Scraping (`retailer_scrape.py`)
+
+1. Runs search pages for each configured term on:
+   - `amazon.com`
+   - `sephora.com`
+   - `ulta.com`
+2. Parses JSON-LD `Product` records when available
+3. Falls back to product-link extraction by retailer URL pattern
+4. Upserts:
+   - `Brand`
+   - `Product` (source: `<retailer>_scrape`, source_id: retailer external id)
+   - `ProductPrice` (`source` = retailer slug, stores product link + price when available)
+5. Stats recorded: products_created, products_updated, prices_written, candidates_seen, pages_fetched, api_errors
 
 ### Walmart Price Enrichment (`walmart_affiliate.py`)
 
@@ -151,6 +171,7 @@ app/ingestion/
 ├── __init__.py              # Job runner, DB locking, run recording
 ├── scheduler.py             # APScheduler job registration
 ├── open_beauty_facts.py     # OBF catalog ingestion
+├── retailer_scrape.py       # Retailer site scraping (Amazon/Sephora/Ulta)
 ├── walmart_affiliate.py     # Walmart price enrichment
 └── score_calculator.py      # StampScore recalculation
 
