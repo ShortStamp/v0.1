@@ -6,7 +6,8 @@ import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
 import { getQuizAutoFilters } from "@/lib/personalization";
 import { X, Search, Star, Plus, LayoutGrid, List } from "lucide-react";
-import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
+import AddToBagCard from "@/components/AddToBagCard";
+import { getProductColorInfo } from "@/lib/productColor";
 
 type ViewMode = "tiles" | "list";
 
@@ -190,88 +191,67 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.map((product) => (
-                    <tr key={product.id} className="hover:bg-muted/50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
-                            <img
-                              src={product.image || "/placeholder-product.jpg"}
-                              alt={product.name}
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                              onError={(e) => {
-                                e.currentTarget.src = "/placeholder-product.jpg";
-                              }}
-                            />
+                  {filtered.map((product) => {
+                    const colorInfo = getProductColorInfo(product);
+                    return (
+                      <tr key={product.id} className="hover:bg-muted/50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
+                              <img
+                                src={product.image || "/placeholder-product.jpg"}
+                                alt={product.name}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.currentTarget.src = "/placeholder-product.jpg";
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <p className="font-medium">{product.name}</p>
+                              <p className="text-xs text-foreground/50">{product.brand}</p>
+                              <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-foreground/50">
+                                <span
+                                  className="inline-block h-2.5 w-2.5 rounded-full border border-black/10"
+                                  style={{ backgroundColor: colorInfo.hex }}
+                                  title={colorInfo.label}
+                                />
+                                {colorInfo.label}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{getDisplayName(product.name)}</p>
-                            <p className="text-xs text-foreground/50">{getDisplayBrand(product.brand)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hidden px-4 py-3 sm:table-cell">
-                        <span className="inline-flex items-center gap-1 text-xs">
-                          <Star className="h-3.5 w-3.5 fill-pink-400 text-pink-400" />
-                          {product.stampScore}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {formatPrice(getBestOfferForProduct(product)?.price)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => onSelect(product)}
-                          className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white hover:brightness-110"
-                        >
-                          <Plus className="h-3.5 w-3.5" /> Add
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="hidden px-4 py-3 sm:table-cell">
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            <Star className="h-3.5 w-3.5 fill-pink-400 text-pink-400" />
+                            {product.stampScore}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold">
+                          ${lowestPrice(product).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => onSelect(product)}
+                            className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white hover:brightness-110"
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add To Bag
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
               <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {filtered.map((product) => (
-                  <div
+                  <AddToBagCard
                     key={product.id}
-                    className="flex aspect-[3/5] flex-col rounded-xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10"
-                  >
-                    <div className="h-[74%] overflow-hidden rounded-t-xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-1.5">
-                      <img
-                        src={product.image || "/placeholder-product.jpg"}
-                        alt={product.name}
-                        className="h-full w-full object-contain"
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.src = "/placeholder-product.jpg";
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-1 flex-col gap-1 p-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] text-foreground/50">{getDisplayBrand(product.brand)}</p>
-                          <h3 className="text-[11px] font-semibold leading-tight">{getDisplayName(product.name)}</h3>
-                        </div>
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-pink-50 px-1.5 py-0.5 text-[10px] font-medium text-pink-600">
-                          <Star className="h-2.5 w-2.5 fill-pink-400 text-pink-400" />
-                          {product.stampScore}
-                        </span>
-                      </div>
-                      <p className="mt-auto text-sm font-bold text-accent">
-                        {formatPrice(getBestOfferForProduct(product)?.price)}
-                      </p>
-                      <button
-                        onClick={() => onSelect(product)}
-                        className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-2 py-1.5 text-[11px] font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
-                      >
-                        <Plus className="h-3 w-3" /> Add
-                      </button>
-                    </div>
-                  </div>
+                    product={product}
+                    onAddToBag={() => onSelect(product)}
+                  />
                 ))}
               </div>
             )
