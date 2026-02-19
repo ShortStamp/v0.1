@@ -29,6 +29,7 @@ import {
   PenLine,
   type LucideIcon,
 } from "lucide-react";
+import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 
 const categoryIcons: Record<CategoryKey, LucideIcon> = {
   foundation: Droplets,
@@ -97,7 +98,7 @@ export default function GroupPage() {
     });
   };
 
-  const lowestPrice = (p: Product) => Math.min(...p.prices.map((r) => r.price));
+  const lowestPrice = (p: Product) => getBestOfferForProduct(p)?.price ?? 0;
 
   const categoryLabel = (key: CategoryKey) =>
     categoryDefinitions.find((c) => c.key === key)?.label ?? key;
@@ -155,7 +156,7 @@ export default function GroupPage() {
                 <div className="mb-4 h-20 w-full overflow-hidden rounded-xl bg-muted">
                   <img
                     src={slot.product!.image || "/placeholder-product.jpg"}
-                    alt={slot.product!.name}
+                    alt={getDisplayName(slot.product!.name)}
                     className="h-full w-full object-cover"
                     loading="lazy"
                     onError={(e) => {
@@ -174,16 +175,16 @@ export default function GroupPage() {
 
               {filled ? (
                 <>
-                  <p className="text-xs text-foreground/40">{slot.product!.brand}</p>
-                  <p className="text-sm font-medium leading-snug">{slot.product!.name}</p>
+                  <p className="text-xs text-foreground/40">{getDisplayBrand(slot.product!.brand)}</p>
+                  <p className="text-sm font-medium leading-snug">{getDisplayName(slot.product!.name)}</p>
                   <p className="mt-auto pt-2 text-base font-bold text-accent">
-                    ${lowestPrice(slot.product!).toFixed(2)}
+                    {formatPrice(lowestPrice(slot.product!))}
                   </p>
 
                   <button
                     onClick={() => handleRemove(catKey)}
                     className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-pink-100 text-pink-400 shadow-sm transition-colors hover:bg-accent hover:text-white"
-                    aria-label={`Remove ${slot.product!.name}`}
+                    aria-label={`Remove ${getDisplayName(slot.product!.name)}`}
                   >
                     <XIcon className="h-3.5 w-3.5" />
                   </button>

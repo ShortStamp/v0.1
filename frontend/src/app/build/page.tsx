@@ -10,6 +10,7 @@ import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
 import { readBuildSlots, saveBuildSlot, removeBuildSlot } from "@/lib/buildSlots";
 import { ExternalLink, X, Eye } from "lucide-react";
+import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 
 const mainCategories: CategoryKey[] = [
   "foundation",
@@ -102,8 +103,7 @@ export default function BuildPage() {
   };
 
   const getLowestPrice = (product: Product) => {
-    const sorted = [...product.prices].sort((a, b) => a.price - b.price);
-    return sorted[0];
+    return getBestOfferForProduct(product);
   };
 
   if (loading) {
@@ -164,11 +164,11 @@ export default function BuildPage() {
                         }}
                       />
                     </div>
-                    <div className="mb-1 text-sm font-semibold">{slot.product.name}</div>
-                    <div className="mb-3 text-xs text-foreground/50">{slot.product.brand}</div>
+                    <div className="mb-1 text-sm font-semibold">{getDisplayName(slot.product.name)}</div>
+                    <div className="mb-3 text-xs text-foreground/50">{getDisplayBrand(slot.product.brand)}</div>
                     {best && (
                       <div className="mb-3 text-sm font-bold text-accent">
-                        ${best.price.toFixed(2)}
+                        {formatPrice(best.price)}
                       </div>
                     )}
                     <div className="flex gap-2">

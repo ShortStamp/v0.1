@@ -3,6 +3,7 @@
 import { ToolboxSlot } from "@/types";
 import { Check, ShoppingCart, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { getBestOffer, hasKnownPrice } from "@/lib/pricing";
 
 interface ToolboxProps {
   slots: ToolboxSlot[];
@@ -14,13 +15,12 @@ export default function Toolbox({ slots }: ToolboxProps) {
 
   const getLowestRetailer = (slot: ToolboxSlot) => {
     if (!slot.product) return null;
-    const sorted = [...slot.product.prices].sort((a, b) => a.price - b.price);
-    return sorted[0] || null;
+    return getBestOffer(slot.product.prices);
   };
 
   const total = filledSlots.reduce((sum, s) => {
     const best = getLowestRetailer(s);
-    return sum + (best?.price || 0);
+    return sum + (best && hasKnownPrice(best) ? best.price : 0);
   }, 0);
   const isComplete = filledSlots.length >= 3;
 
@@ -100,7 +100,9 @@ export default function Toolbox({ slots }: ToolboxProps) {
                 >
                   <span>{slot.product!.name}</span>
                   <span className="font-medium">
-                    ${best?.price.toFixed(2)} @ {best?.retailer}
+                    {best && hasKnownPrice(best)
+                      ? `$${best.price.toFixed(2)} @ ${best.retailer}`
+                      : "See retailer"}
                   </span>
                 </div>
               );

@@ -331,14 +331,23 @@ class ApiClient {
 
 /** Map snake_case API response to camelCase Product type */
 function mapProduct(data: any): Product {
+  const normalizedPrices = Array.isArray(data.prices)
+    ? data.prices.map((p: any) => ({
+        retailer: p?.retailer || "Retailer",
+        price: Number.isFinite(Number(p?.price)) ? Number(p.price) : 0,
+        url: p?.url || "#",
+        inStock: Boolean(p?.in_stock ?? p?.inStock ?? true),
+      }))
+    : [];
+
   return {
     id: data.id,
-    name: data.name,
-    brand: data.brand,
-    image: data.image,
+    name: (data.name || "Product").toString().trim(),
+    brand: (data.brand || "Unknown").toString().trim(),
+    image: data.image || "/placeholder-product.jpg",
     category: data.category,
     stampScore: data.stamp_score,
-    prices: data.prices || [],
+    prices: normalizedPrices,
     description: data.description,
     specs: data.specs,
     reviews: data.reviews,

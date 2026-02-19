@@ -6,6 +6,7 @@ import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
 import { getQuizAutoFilters } from "@/lib/personalization";
 import { X, Search, Star, Plus, LayoutGrid, List } from "lucide-react";
+import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 
 type ViewMode = "tiles" | "list";
 
@@ -99,8 +100,6 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
       return next;
     });
   };
-
-  const lowestPrice = (p: Product) => Math.min(...p.prices.map((r) => r.price));
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -207,8 +206,8 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                             />
                           </div>
                           <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-xs text-foreground/50">{product.brand}</p>
+                            <p className="font-medium">{getDisplayName(product.name)}</p>
+                            <p className="text-xs text-foreground/50">{getDisplayBrand(product.brand)}</p>
                           </div>
                         </div>
                       </td>
@@ -219,7 +218,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">
-                        ${lowestPrice(product).toFixed(2)}
+                        {formatPrice(getBestOfferForProduct(product)?.price)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -254,8 +253,8 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                     <div className="flex flex-1 flex-col gap-1 p-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-[10px] text-foreground/50">{product.brand}</p>
-                          <h3 className="text-[11px] font-semibold leading-tight">{product.name}</h3>
+                          <p className="text-[10px] text-foreground/50">{getDisplayBrand(product.brand)}</p>
+                          <h3 className="text-[11px] font-semibold leading-tight">{getDisplayName(product.name)}</h3>
                         </div>
                         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-pink-50 px-1.5 py-0.5 text-[10px] font-medium text-pink-600">
                           <Star className="h-2.5 w-2.5 fill-pink-400 text-pink-400" />
@@ -263,7 +262,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                         </span>
                       </div>
                       <p className="mt-auto text-sm font-bold text-accent">
-                        ${lowestPrice(product).toFixed(2)}
+                        {formatPrice(getBestOfferForProduct(product)?.price)}
                       </p>
                       <button
                         onClick={() => onSelect(product)}
