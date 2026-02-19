@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BeautyProfile } from "@/types";
 import { quizQuestions } from "@/lib/quiz";
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import {
   Cloud,
   Sun,
@@ -193,11 +194,21 @@ export default function QuizPage() {
     };
   }, [done]);
 
+  async function syncProfileToAPI() {
+    try {
+      const raw = localStorage.getItem("beautyProfile");
+      if (!raw) return;
+      const profile = JSON.parse(raw) as BeautyProfile;
+      await api.saveProfile(profile);
+    } catch {}
+  }
+
   async function handleGoogleResponse(response: any) {
     setAuthLoading(true);
     setAuthError("");
     try {
       await loginWithGoogle(response.credential);
+      await syncProfileToAPI();
       router.push("/build");
     } catch (err: any) {
       setAuthError(err.message || "Google sign-in failed");
@@ -224,6 +235,7 @@ export default function QuizPage() {
           response.authorization.id_token,
           response.user || undefined
         );
+        await syncProfileToAPI();
         router.push("/build");
       }
     } catch (err: any) {
@@ -245,6 +257,7 @@ export default function QuizPage() {
       } else {
         await login(email, password);
       }
+      await syncProfileToAPI();
       router.push("/build");
     } catch (err: any) {
       setAuthError(err.message || "Authentication failed");
@@ -274,7 +287,7 @@ export default function QuizPage() {
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm">
           {/* Check icon */}
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-accent to-secondary">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center bg-foreground">
             <Check className="h-8 w-8 text-white" />
           </div>
 
@@ -290,7 +303,7 @@ export default function QuizPage() {
           <button
             onClick={handleGoogleClick}
             disabled={authLoading}
-            className="mb-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 text-xs font-medium uppercase tracking-[0.15em] text-foreground transition-all hover:border-accent hover:shadow-md hover:shadow-accent/10 disabled:opacity-50"
+            className="mb-3 flex w-full items-center justify-center gap-3 border border-border bg-white px-4 py-3 text-xs font-medium uppercase tracking-[0.15em] text-foreground transition-all hover:border-foreground hover:shadow-md hover:shadow-black/5 disabled:opacity-50"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -304,7 +317,7 @@ export default function QuizPage() {
           <button
             onClick={handleAppleClick}
             disabled={authLoading}
-            className="mb-6 flex w-full items-center justify-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 text-xs font-medium uppercase tracking-[0.15em] text-foreground transition-all hover:border-accent hover:shadow-md hover:shadow-accent/10 disabled:opacity-50"
+            className="mb-6 flex w-full items-center justify-center gap-3 border border-border bg-white px-4 py-3 text-xs font-medium uppercase tracking-[0.15em] text-foreground transition-all hover:border-foreground hover:shadow-md hover:shadow-black/5 disabled:opacity-50"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
               <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.53-3.23 0-1.44.62-2.2.44-3.06-.4C3.79 16.17 4.36 9.53 8.82 9.28c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.3 4.12zM12.03 9.2C11.88 6.88 13.76 5 15.96 4.82c.3 2.67-2.42 4.65-3.93 4.38z" />
@@ -327,7 +340,7 @@ export default function QuizPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="mb-3 w-full rounded-2xl border border-border bg-white px-4 py-3 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-accent"
+              className="mb-3 w-full border border-border bg-white px-4 py-3 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-foreground"
             />
             <input
               type="password"
@@ -336,12 +349,12 @@ export default function QuizPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="mb-4 w-full rounded-2xl border border-border bg-white px-4 py-3 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-accent"
+              className="mb-4 w-full border border-border bg-white px-4 py-3 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-foreground"
             />
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full rounded-2xl bg-gradient-to-r from-accent to-secondary px-4 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:brightness-105 disabled:opacity-50"
+              className="w-full bg-foreground px-4 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-black/10 transition-all hover:shadow-xl disabled:opacity-50"
             >
               {authMode === "signup" ? "CREATE ACCOUNT" : "LOG IN"}
             </button>
@@ -361,7 +374,7 @@ export default function QuizPage() {
                     setAuthMode("login");
                     setAuthError("");
                   }}
-                  className="font-medium uppercase tracking-wider text-accent transition-opacity hover:opacity-70"
+                  className="font-medium uppercase tracking-wider text-foreground transition-opacity hover:opacity-70"
                 >
                   LOG IN
                 </button>
@@ -374,7 +387,7 @@ export default function QuizPage() {
                     setAuthMode("signup");
                     setAuthError("");
                   }}
-                  className="font-medium uppercase tracking-wider text-accent transition-opacity hover:opacity-70"
+                  className="font-medium uppercase tracking-wider text-foreground transition-opacity hover:opacity-70"
                 >
                   SIGN UP
                 </button>
@@ -406,9 +419,9 @@ export default function QuizPage() {
   return (
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-background">
       {/* Progress bar */}
-      <div className="h-1 w-full shrink-0 rounded-full bg-muted">
+      <div className="h-1 w-full shrink-0 bg-muted">
         <div
-          className="h-1 rounded-full bg-gradient-to-r from-accent to-secondary transition-all duration-300 ease-out"
+          className="h-1 bg-foreground transition-all duration-300 ease-out"
           style={{ width: `${((step + 1) / total) * 100}%` }}
         />
       </div>
@@ -418,7 +431,7 @@ export default function QuizPage() {
         {step > 0 ? (
           <button
             onClick={goBack}
-            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.1em] text-foreground/40 transition-colors hover:text-accent"
+            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.1em] text-foreground/40 transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
@@ -454,12 +467,12 @@ export default function QuizPage() {
                 key={opt.value}
                 onClick={() => advance(opt.value)}
                 disabled={selected !== null}
-                className={`group relative flex flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center transition-all duration-200 ${
+                className={`group relative flex flex-col items-center justify-center gap-3 border px-4 py-5 text-center transition-all duration-200 ${
                   isSelected
-                    ? "border-accent bg-gradient-to-br from-accent to-secondary text-white shadow-lg shadow-accent/20"
+                    ? "border-foreground bg-foreground text-white shadow-lg shadow-black/10"
                     : wasPreviouslyChosen
-                      ? "border-accent bg-accent/5"
-                      : "border-border bg-white hover:border-accent hover:shadow-md hover:shadow-accent/10"
+                      ? "border-foreground bg-muted"
+                      : "border-border bg-white hover:border-foreground hover:shadow-md hover:shadow-black/5"
                 }`}
               >
                 {/* Icon */}
@@ -468,8 +481,8 @@ export default function QuizPage() {
                     isSelected
                       ? "text-white"
                       : wasPreviouslyChosen
-                        ? "text-pink-500"
-                        : "text-pink-200 group-hover:text-pink-500"
+                        ? "text-foreground"
+                        : "text-foreground/20 group-hover:text-foreground"
                   }`}
                 />
 

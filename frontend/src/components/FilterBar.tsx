@@ -14,10 +14,10 @@ export default function FilterBar({ activeFilter, onFilterChange }: FilterBarPro
         <button
           key={filter}
           onClick={() => onFilterChange(filter)}
-          className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
             activeFilter === filter
-              ? "bg-accent text-white shadow-md shadow-accent/20"
-              : "bg-muted text-foreground/60 hover:bg-accent/10 hover:text-accent"
+              ? "bg-foreground text-background"
+              : "bg-muted text-foreground/60 hover:bg-foreground/10 hover:text-foreground"
           }`}
         >
           {filter}

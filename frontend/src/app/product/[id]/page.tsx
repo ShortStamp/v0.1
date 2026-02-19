@@ -6,6 +6,7 @@ import { Product } from "@/types";
 import { api } from "@/lib/api";
 import ShortStampBadge from "@/components/ShortStampBadge";
 import PriceComparisonTable from "@/components/PriceComparisonTable";
+import PriceHistoryChart from "@/components/PriceHistoryChart";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import SaveProductButton from "@/components/SaveProductButton";
@@ -60,13 +61,13 @@ export default function ProductPage() {
     <div className="mx-auto max-w-4xl px-4 py-8">
       <Link
         href="/build"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-accent"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Build
       </Link>
 
       <div className="mb-8 grid gap-8 md:grid-cols-2">
-        <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-6">
+        <div className="flex aspect-[3/4] items-center justify-center overflow-hidden bg-muted p-6">
           <img
             src={product.image || "/placeholder-product.jpg"}
             alt={getDisplayName(product.name)}
@@ -81,7 +82,7 @@ export default function ProductPage() {
           <p className="text-sm text-foreground/50">{getDisplayBrand(product.brand)}</p>
           <h1 className="text-2xl font-bold">{getDisplayName(product.name)}</h1>
           <ShortStampBadge score={product.stampScore} />
-          <p className="text-2xl font-bold text-accent">{formatPrice(bestRetailer?.price)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatPrice(bestRetailer?.price)}</p>
           {product.description && (
             <p className="text-sm text-foreground/60">{product.description}</p>
           )}
@@ -89,7 +90,7 @@ export default function ProductPage() {
             <ul className="mt-2 space-y-1 text-sm text-foreground/60">
               {product.specs.map((spec) => (
                 <li key={spec} className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                  <span className="h-1.5 w-1.5 bg-foreground" />
                   {spec}
                 </li>
               ))}
@@ -102,7 +103,7 @@ export default function ProductPage() {
                 href={bestRetailer.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
+                className="inline-flex w-full items-center justify-center gap-2 bg-foreground px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-foreground/90"
               >
                 Buy Now - {formatPrice(bestRetailer.price)} at {bestRetailer.retailer}
               </a>
@@ -112,7 +113,7 @@ export default function ProductPage() {
                 href={walmartUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center gap-2 border border-border px-6 py-3 text-sm font-semibold text-foreground transition-all hover:border-accent hover:text-accent"
+                className="inline-flex w-full items-center justify-center gap-2 border border-border px-6 py-3 text-sm font-semibold text-foreground transition-all hover:border-foreground"
               >
                 View on Walmart
               </a>
@@ -129,9 +130,7 @@ export default function ProductPage() {
 
       <section>
         <h2 className="mb-4 text-xl font-semibold">Price History</h2>
-        <div className="rounded-2xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
-          Price history chart coming soon - track price changes over time.
-        </div>
+        <PriceHistoryChart productId={product.id} />
       </section>
     </div>
   );

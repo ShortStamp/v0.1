@@ -40,9 +40,9 @@ export default function Toolbox({ slots }: ToolboxProps) {
 
   return (
     <div
-      className={`mt-8 rounded-2xl p-5 transition-colors ${
+      className={`mt-8 p-5 transition-colors ${
         isComplete
-          ? "bg-gradient-to-r from-accent to-secondary text-white shadow-lg shadow-accent/20"
+          ? "bg-foreground text-background shadow-lg shadow-black/10"
           : "border border-border bg-muted"
       }`}
     >
@@ -74,8 +74,8 @@ export default function Toolbox({ slots }: ToolboxProps) {
               disabled={buyingAll}
               className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all ${
                 isComplete
-                  ? "bg-white text-accent hover:bg-white/90 disabled:opacity-50"
-                  : "bg-accent text-white hover:brightness-110 disabled:opacity-50"
+                  ? "bg-background text-foreground hover:bg-background/90 disabled:opacity-50"
+                  : "bg-foreground text-background hover:opacity-80 disabled:opacity-50"
               }`}
             >
               <ShoppingCart className="h-4 w-4" />

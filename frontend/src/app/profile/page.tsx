@@ -1,9 +1,11 @@
 "use client";
 
-import { Upload, Bell, BellOff, Edit } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Upload, Bell, BellOff, Edit, Save } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BeautyProfile } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import Link from "next/link";
 
 const styleOptions = [
@@ -19,16 +21,61 @@ const styleOptions = [
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(false);
   const [beautyProfile, setBeautyProfile] = useState<BeautyProfile | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("beautyProfile");
-    if (saved) {
-      setBeautyProfile(JSON.parse(saved));
+    // Load beauty profile from localStorage
+    const local = localStorage.getItem("beautyProfile");
+    if (local) {
+      setBeautyProfile(JSON.parse(local));
     }
-  }, []);
+
+    // Load remote data if authenticated
+    if (isAuthenticated) {
+      (async () => {
+        try {
+          const [profile, styles, notif] = await Promise.allSettled([
+            api.getProfile(),
+            api.getStyles(),
+            api.getNotifications(),
+          ]);
+          if (profile.status === "fulfilled" && profile.value.skinTone) {
+            setBeautyProfile(profile.value);
+            localStorage.setItem("beautyProfile", JSON.stringify(profile.value));
+          }
+          if (styles.status === "fulfilled") {
+            setSelectedStyles(styles.value);
+          }
+          if (notif.status === "fulfilled") {
+            setNotifications(notif.value);
+          }
+        } catch {}
+      })();
+    }
+  }, [isAuthenticated]);
+
+  const handleSave = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setSaving(true);
+    setSaved(false);
+    try {
+      const promises: Promise<void>[] = [];
+      if (beautyProfile) {
+        promises.push(api.saveProfile(beautyProfile));
+      }
+      promises.push(api.saveStyles(selectedStyles));
+      promises.push(api.saveNotifications(notifications));
+      await Promise.all(promises);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {}
+    setSaving(false);
+  }, [isAuthenticated, beautyProfile, selectedStyles, notifications]);
 
   const toggleStyle = (style: string) => {
     setSelectedStyles((prev) =>
@@ -51,13 +98,13 @@ export default function ProfilePage() {
             <h2 className="text-xl font-semibold">Beauty Profile</h2>
             <Link
               href="/quiz"
-              className="inline-flex items-center gap-2 text-sm font-medium text-foreground/50 hover:text-accent"
+              className="inline-flex items-center gap-2 text-sm font-medium text-foreground/50 hover:text-foreground"
             >
               <Edit className="h-4 w-4" />
               Retake Quiz
             </Link>
           </div>
-          <div className="rounded-2xl border border-border bg-muted p-6">
+          <div className="border border-border bg-muted p-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <div className="mb-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
@@ -113,13 +160,13 @@ export default function ProfilePage() {
       ) : (
         <section className="mb-10">
           <h2 className="mb-4 text-xl font-semibold">Beauty Profile</h2>
-          <div className="rounded-2xl border border-border bg-muted p-6 text-center">
+          <div className="border border-border bg-muted p-6 text-center">
             <p className="mb-4 text-sm text-foreground/60">
               Complete the quiz to get personalized product recommendations.
             </p>
             <Link
               href="/quiz"
-              className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-xs font-medium uppercase tracking-[0.15em] text-white shadow-md shadow-accent/20 transition-all hover:shadow-lg hover:shadow-accent/25 hover:brightness-110"
+              className="inline-flex items-center gap-2 bg-foreground px-6 py-3 text-xs font-medium uppercase tracking-[0.15em] text-white shadow-md shadow-black/10 transition-all hover:shadow-lg"
             >
               Take the Quiz
             </Link>
@@ -134,8 +181,8 @@ export default function ProfilePage() {
           Upload a photo to get trend recommendations matched to your face shape
           and features.
         </p>
-        <div className="flex h-48 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border transition-colors hover:border-accent hover:bg-accent/5">
-          <Upload className="h-8 w-8 text-pink-300" />
+        <div className="flex h-48 cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed border-border transition-colors hover:border-foreground hover:bg-muted">
+          <Upload className="h-8 w-8 text-foreground/20" />
           <p className="text-sm font-medium text-foreground/50">
             Click to upload a photo
           </p>
@@ -154,10 +201,10 @@ export default function ProfilePage() {
             <button
               key={style}
               onClick={() => toggleStyle(style)}
-              className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+              className={`border px-4 py-2 text-sm font-medium transition-all ${
                 selectedStyles.includes(style)
-                  ? "border-accent bg-accent/10 text-accent shadow-sm"
-                  : "border-border text-foreground/60 hover:border-accent/50 hover:text-accent"
+                  ? "border-foreground bg-foreground text-white shadow-sm"
+                  : "border-border text-foreground/60 hover:border-foreground hover:text-foreground"
               }`}
             >
               {style}
@@ -171,14 +218,14 @@ export default function ProfilePage() {
         <h2 className="mb-4 text-xl font-semibold">Notifications</h2>
         <button
           onClick={() => setNotifications(!notifications)}
-          className={`flex items-center gap-3 rounded-2xl border px-5 py-4 transition-all ${
+          className={`flex items-center gap-3 border px-5 py-4 transition-all ${
             notifications
-              ? "border-accent bg-accent/5 shadow-sm"
-              : "border-border hover:border-accent/50"
+              ? "border-foreground bg-muted shadow-sm"
+              : "border-border hover:border-foreground"
           }`}
         >
           {notifications ? (
-            <Bell className="h-5 w-5 text-accent" />
+            <Bell className="h-5 w-5 text-foreground" />
           ) : (
             <BellOff className="h-5 w-5 text-foreground/40" />
           )}
@@ -192,6 +239,20 @@ export default function ProfilePage() {
           </div>
         </button>
       </section>
+
+      {/* Save button (authenticated users) */}
+      {isAuthenticated && (
+        <div className="mt-10 border-t border-border pt-6">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 bg-foreground px-6 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white transition-all hover:bg-foreground/90 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            {saving ? "SAVING..." : saved ? "SAVED" : "SAVE PROFILE"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

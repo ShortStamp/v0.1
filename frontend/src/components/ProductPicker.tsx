@@ -8,6 +8,7 @@ import { getQuizAutoFilters } from "@/lib/personalization";
 import { X, Search, Star, Plus, LayoutGrid, List } from "lucide-react";
 import AddToBagCard from "@/components/AddToBagCard";
 import { getProductColorInfo } from "@/lib/productColor";
+import { getBestOfferForProduct } from "@/lib/pricing";
 
 type ViewMode = "tiles" | "list";
 
@@ -107,14 +108,14 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <h2 className="text-xl font-bold">Choose {category.label}</h2>
-        <button onClick={onClose} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
+        <button onClick={onClose} className="p-2 hover:bg-muted" aria-label="Close">
           <X className="h-5 w-5" />
         </button>
       </div>
 
       {/* Search bar + view toggle */}
       <div className="flex items-center gap-3 border-b border-border px-6 py-3">
-        <div className="flex flex-1 items-center gap-2 rounded-full border border-border px-4 py-2">
+        <div className="flex flex-1 items-center gap-2 border border-border px-4 py-2">
           <Search className="h-4 w-4 text-foreground/40" />
           <input
             type="text"
@@ -124,17 +125,17 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground/40"
           />
         </div>
-        <div className="flex rounded-full border border-border overflow-hidden">
+        <div className="flex border border-border overflow-hidden">
           <button
             onClick={() => setViewMode("tiles")}
-            className={`p-2 ${viewMode === "tiles" ? "bg-accent text-white" : "text-foreground/50 hover:bg-muted"}`}
+            className={`p-2 ${viewMode === "tiles" ? "bg-foreground text-background" : "text-foreground/50 hover:bg-muted"}`}
             aria-label="Tile view"
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
           <button
             onClick={() => setViewMode("list")}
-            className={`p-2 ${viewMode === "list" ? "bg-accent text-white" : "text-foreground/50 hover:bg-muted"}`}
+            className={`p-2 ${viewMode === "list" ? "bg-foreground text-background" : "text-foreground/50 hover:bg-muted"}`}
             aria-label="List view"
           >
             <List className="h-4 w-4" />
@@ -221,22 +222,24 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                               </p>
                             </div>
                           </div>
+                          </div>
+                        </div>
                         </td>
                         <td className="hidden px-4 py-3 sm:table-cell">
                           <span className="inline-flex items-center gap-1 text-xs">
-                            <Star className="h-3.5 w-3.5 fill-pink-400 text-pink-400" />
+                            <Star className="h-3.5 w-3.5 fill-foreground text-foreground" />
                             {product.stampScore}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-semibold">
-                          ${lowestPrice(product).toFixed(2)}
+                          ${(getBestOfferForProduct(product)?.price ?? 0).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => onSelect(product)}
-                            className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white hover:brightness-110"
+                            className="inline-flex items-center gap-1 bg-foreground px-4 py-1.5 text-xs font-medium text-background hover:opacity-80"
                           >
-                            <Plus className="h-3.5 w-3.5" /> Add To Bag
+                            <Plus className="h-3.5 w-3.5" /> Add
                           </button>
                         </td>
                       </tr>

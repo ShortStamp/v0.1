@@ -34,7 +34,7 @@ export default function Navbar() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link
           href="/"
-          className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-base font-bold uppercase tracking-[0.2em] text-transparent"
+          className="text-foreground text-base font-bold uppercase tracking-[0.2em]"
         >
           SHORTSTAMP
         </Link>
@@ -45,9 +45,9 @@ export default function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-accent ${
+              className={`text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-foreground ${
                 pathname === link.href
-                  ? "text-accent underline underline-offset-4 decoration-accent-light"
+                  ? "text-foreground underline underline-offset-4 decoration-foreground"
                   : "text-foreground/50"
               }`}
             >
@@ -57,7 +57,7 @@ export default function Navbar() {
           {isAuthenticated && (
             <button
               onClick={handleLogout}
-              className="text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-accent"
+              className="text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-foreground"
             >
               LOG OUT
             </button>
@@ -66,7 +66,7 @@ export default function Navbar() {
 
         {/* Mobile toggle */}
         <button
-          className="rounded-xl p-2 transition-colors hover:bg-muted md:hidden"
+          className="p-2 transition-colors hover:bg-muted md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
@@ -82,9 +82,9 @@ export default function Navbar() {
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-              className={`block py-3 text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-accent ${
+              className={`block py-3 text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-foreground ${
                 pathname === link.href
-                  ? "text-accent underline underline-offset-4 decoration-accent-light"
+                  ? "text-foreground underline underline-offset-4 decoration-foreground"
                   : "text-foreground/50"
               }`}
             >
@@ -94,7 +94,7 @@ export default function Navbar() {
           {isAuthenticated && (
             <button
               onClick={handleLogout}
-              className="block w-full py-3 text-left text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-accent"
+              className="block w-full py-3 text-left text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-foreground"
             >
               LOG OUT
             </button>

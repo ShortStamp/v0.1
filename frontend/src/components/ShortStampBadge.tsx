@@ -16,12 +16,12 @@ export default function ShortStampBadge({
 
   const color =
     score >= 90
-      ? "bg-pink-50 text-pink-700 ring-1 ring-pink-200"
+      ? "bg-foreground text-background"
       : score >= 80
-        ? "bg-rose-50 text-rose-600 ring-1 ring-rose-200"
+        ? "bg-foreground/80 text-background"
         : score >= 70
-          ? "bg-fuchsia-50 text-fuchsia-600 ring-1 ring-fuchsia-200"
-          : "bg-pink-100 text-pink-800 ring-1 ring-pink-300";
+          ? "bg-foreground/60 text-background"
+          : "bg-muted text-foreground ring-1 ring-border";
 
   const Icon =
     direction === "rising"
@@ -32,7 +32,7 @@ export default function ShortStampBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full font-semibold ${color} ${
+      className={`inline-flex items-center gap-1 font-semibold ${color} ${
         size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
       }`}
     >

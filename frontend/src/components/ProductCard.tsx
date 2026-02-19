@@ -15,8 +15,8 @@ export default function ProductCard({ product, onSelect, selectable }: ProductCa
   const displayName = getDisplayName(product.name);
 
   const content = (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
-      <div className="flex h-48 items-center justify-center bg-gradient-to-br from-pink-50 via-muted to-rose-50">
+    <div className="group flex flex-col overflow-hidden border border-border bg-background transition-all hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5">
+      <div className="flex h-48 items-center justify-center bg-muted">
         <img
           src={product.image || "/placeholder-product.jpg"}
           alt={displayName}
@@ -35,7 +35,7 @@ export default function ProductCard({ product, onSelect, selectable }: ProductCa
           </div>
           <ShortStampBadge score={product.stampScore} size="sm" />
         </div>
-        <p className="mt-auto text-lg font-bold text-accent">
+        <p className="mt-auto text-lg font-bold text-foreground">
           {formatPrice(bestOffer?.price)}
         </p>
       </div>

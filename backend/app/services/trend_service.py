@@ -83,6 +83,6 @@ async def get_trend(db: AsyncSession, trend_id: str) -> TrendDetail:
         description=trend.description,
         direction=trend.direction,
         products=products,
-        videos=[v.url for v in trend.videos],
+        videos=[{"title": v.title, "url": v.url} for v in trend.videos],
         articles=[{"title": a.title, "url": a.url} for a in trend.articles],
     )

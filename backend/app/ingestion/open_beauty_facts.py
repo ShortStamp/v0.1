@@ -18,7 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.ingestion import run_job
-from app.models.product import Brand, Product
+from app.ingestion.filter_extractor import extract_filters_from_obf_product
+from app.models.product import Brand, Product, ProductFilterValue
 from app.services.obf_client import search_products
 
 import httpx
@@ -112,8 +113,11 @@ async def _upsert_product(
     image_url: str | None,
     description: str | None,
     source_id: str | None,
+    filters: dict[str, str] | None = None,
 ) -> str:
     """Upsert a product by barcode (preferred) or (brand_id + normalized name).
+    
+    Also upserts filter values if provided.
 
     Returns: "created", "updated", or "skipped" (no meaningful change).
     """
@@ -145,6 +149,11 @@ async def _upsert_product(
             existing.upc = barcode
         if image_url and existing.image_url == "/placeholder-product.jpg":
             existing.image_url = image_url
+        
+        # Update filter values if provided
+        if filters:
+            await _upsert_filter_values(db, existing.id, filters)
+        
         return "updated"
 
     # Create new product
@@ -160,7 +169,41 @@ async def _upsert_product(
         last_seen_at=now,
     )
     db.add(product)
+    await db.flush()  # Get product ID
+    
+    # Create filter values if provided
+    if filters:
+        await _upsert_filter_values(db, product.id, filters)
+    
     return "created"
+
+
+async def _upsert_filter_values(
+    db: AsyncSession, product_id: str, filters: dict[str, str]
+) -> None:
+    """Upsert filter values for a product.
+    
+    Replaces existing filter values with new ones.
+    """
+    # Delete existing filter values for this product
+    await db.execute(
+        select(ProductFilterValue).where(ProductFilterValue.product_id == product_id)
+    )
+    result = await db.execute(
+        select(ProductFilterValue).where(ProductFilterValue.product_id == product_id)
+    )
+    existing_filters = result.scalars().all()
+    for fv in existing_filters:
+        await db.delete(fv)
+    
+    # Create new filter values
+    for filter_key, value in filters.items():
+        filter_value = ProductFilterValue(
+            product_id=product_id,
+            filter_key=filter_key,
+            value=value,
+        )
+        db.add(filter_value)
 
 
 async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
@@ -213,6 +256,11 @@ async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
                                     stats["skipped"] += 1
                                     continue
 
+                                # Extract filter values from product name/description
+                                filters = extract_filters_from_obf_product(
+                                    category_key, item
+                                )
+
                                 outcome = await _upsert_product(
                                     db,
                                     barcode=barcode,
@@ -222,6 +270,7 @@ async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
                                     image_url=item.get("image_url"),
                                     description=item.get("generic_name", "").strip() or None,
                                     source_id=barcode,
+                                    filters=filters,
                                 )
                                 stats[outcome] += 1
                         except Exception as exc:

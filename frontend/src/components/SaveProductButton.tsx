@@ -36,8 +36,8 @@ export default function SaveProductButton({ productId, category }: SaveProductBu
         onClick={handleSave}
         className={`inline-flex flex-1 items-center justify-center gap-2 border px-6 py-3 text-sm font-medium transition-all ${
           saved
-            ? "border-accent bg-accent/10 text-accent"
-            : "border-border text-foreground hover:border-accent"
+            ? "border-foreground bg-foreground/10 text-foreground"
+            : "border-border text-foreground hover:border-foreground"
         }`}
       >
         {saved ? (

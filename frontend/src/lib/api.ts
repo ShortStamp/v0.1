@@ -302,6 +302,38 @@ class ApiClient {
     });
   }
 
+  // ---- Price History ----
+
+  async getPriceHistory(productId: string): Promise<{ date: string; price: number; retailer: string }[]> {
+    return this.fetch(`/products/${productId}/price-history`);
+  }
+
+  // ---- Styles & Notifications ----
+
+  async getStyles(): Promise<string[]> {
+    const data = await this.fetch<any>("/users/me/styles");
+    return data.styles || [];
+  }
+
+  async saveStyles(styles: string[]): Promise<void> {
+    await this.fetch("/users/me/styles", {
+      method: "PUT",
+      body: JSON.stringify({ styles }),
+    });
+  }
+
+  async getNotifications(): Promise<boolean> {
+    const data = await this.fetch<any>("/users/me/notifications");
+    return data.enabled ?? false;
+  }
+
+  async saveNotifications(enabled: boolean): Promise<void> {
+    await this.fetch("/users/me/notifications", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
   // ---- Builds ----
 
   async getActiveBuild(): Promise<any> {
