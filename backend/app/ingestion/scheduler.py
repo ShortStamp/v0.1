@@ -2,6 +2,7 @@
 
 Schedule (all times UTC):
     - Open Beauty Facts catalog:  daily at 02:00
+    - Retailer scraping:          every 12 hours
     - Walmart price enrichment:   every 6 hours
     - StampScore recalculation:   every 6 hours
 
@@ -24,6 +25,7 @@ _scheduler: AsyncIOScheduler | None = None
 def _make_scheduler() -> AsyncIOScheduler:
     """Create and configure the scheduler with all ingestion jobs."""
     from app.ingestion.open_beauty_facts import run_ingestion as run_obf
+    from app.ingestion.retailer_scrape import run_ingestion as run_retailer_scrape
     from app.ingestion.score_calculator import run_ingestion as run_scores
     from app.ingestion.walmart_affiliate import run_ingestion as run_walmart
 
@@ -36,6 +38,15 @@ def _make_scheduler() -> AsyncIOScheduler:
         minute=0,
         id="obf_ingest",
         name="Open Beauty Facts catalog ingestion",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_retailer_scrape,
+        "interval",
+        hours=12,
+        id="retailer_scrape",
+        name="Retailer product/link scraping (Amazon/Sephora/Ulta)",
         replace_existing=True,
     )
 
@@ -74,7 +85,7 @@ def start_scheduler() -> None:
 
     _scheduler = _make_scheduler()
     _scheduler.start()
-    logger.info("Ingestion scheduler started (3 jobs registered, timezone=UTC)")
+    logger.info("Ingestion scheduler started (4 jobs registered, timezone=UTC)")
 
 
 def stop_scheduler() -> None:

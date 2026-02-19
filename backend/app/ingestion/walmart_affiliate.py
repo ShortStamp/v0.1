@@ -32,6 +32,13 @@ logger = logging.getLogger(__name__)
 STALE_HOURS = 6
 
 
+def _to_utc(dt: datetime) -> datetime:
+    """Normalize DB datetimes to timezone-aware UTC."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
 def _map_availability(stock: str) -> str:
     """Map Walmart stock string to our availability enum."""
     stock_lower = stock.lower()
@@ -219,7 +226,7 @@ async def ingest_walmart_prices(db: AsyncSession) -> dict[str, Any]:
                 )
             )
             last_fetched = price_result.scalar_one_or_none()
-            if last_fetched and (cutoff - last_fetched).total_seconds() < STALE_HOURS * 3600:
+            if last_fetched and (cutoff - _to_utc(last_fetched)).total_seconds() < STALE_HOURS * 3600:
                 stats["skipped_fresh"] += 1
                 continue
 

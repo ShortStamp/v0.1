@@ -1,13 +1,18 @@
 import { RetailerPrice } from "@/types";
 import { ExternalLink, Check, X } from "lucide-react";
+import { hasKnownPrice } from "@/lib/pricing";
 
 interface PriceComparisonTableProps {
   prices: RetailerPrice[];
 }
 
 export default function PriceComparisonTable({ prices }: PriceComparisonTableProps) {
-  const sorted = [...prices].sort((a, b) => a.price - b.price);
-  const lowestPrice = sorted[0]?.price;
+  const sorted = [...prices].sort((a, b) => {
+    const aKey = hasKnownPrice(a) ? a.price : Number.POSITIVE_INFINITY;
+    const bKey = hasKnownPrice(b) ? b.price : Number.POSITIVE_INFINITY;
+    return aKey - bKey;
+  });
+  const lowestKnownPrice = sorted.find(hasKnownPrice)?.price;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border">
@@ -27,12 +32,12 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
               <td className="px-4 py-3">
                 <span
                   className={
-                    item.price === lowestPrice ? "font-bold text-green-600" : ""
+                    hasKnownPrice(item) && item.price === lowestKnownPrice ? "font-bold text-green-600" : ""
                   }
                 >
-                  ${item.price.toFixed(2)}
+                  {hasKnownPrice(item) ? `$${item.price.toFixed(2)}` : "See retailer"}
                 </span>
-                {item.price === lowestPrice && (
+                {hasKnownPrice(item) && item.price === lowestKnownPrice && (
                   <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                     Best
                   </span>
@@ -46,12 +51,16 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
                 )}
               </td>
               <td className="px-4 py-3 text-right">
-                <a
-                  href={item.url}
-                  className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
-                >
-                  Buy <ExternalLink className="h-3 w-3" />
-                </a>
+                {item.url && item.url !== "#" ? (
+                  <a
+                    href={item.url}
+                    className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
+                  >
+                    Buy <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-xs text-foreground/40">No link</span>
+                )}
               </td>
             </tr>
           ))}

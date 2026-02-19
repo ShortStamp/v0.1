@@ -102,8 +102,6 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
     });
   };
 
-  const lowestPrice = (p: Product) => Math.min(...p.prices.map((r) => r.price));
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
