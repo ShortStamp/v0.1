@@ -1,10 +1,10 @@
 """
 LangGraph orchestrator for the compatibility analysis pipeline.
 
-Current graph (Phase 1 — Chemist Agent only):
-  START → fetch_data → chemist → aggregate → END
+Phase 2 graph — Chemist + Artist Agents in parallel:
+  START → fetch_data → [chemist, artist] → aggregate → END
 
-Future nodes (Phase 4) will be added as parallel branches between fetch_data and aggregate:
+Trend node is stubbed and will be wired in parallel in Phase 3:
   fetch_data → [chemist, artist, trend] → aggregate
 """
 from __future__ import annotations
@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from langgraph.graph import END, START, StateGraph
 
+from app.agents.artist_agent import run_artist_analysis
 from app.agents.chemist_agent import run_chemist_analysis
 from app.database import async_session
 from app.schemas.compatibility import (
@@ -39,7 +40,7 @@ async def fetch_data_node(state: AgentState) -> dict:
     Load ProductSnapshot list and BeautyProfileSnapshot from the DB.
     Agents must not hit the DB directly — this node provides all data they need.
     """
-    from app.models.product import Product, ProductFilterValue
+    from app.models.product import Product, ProductFilterValue  # noqa: F401
     from app.models.user import BeautyProfile
 
     products: list[ProductSnapshot] = []
@@ -71,7 +72,7 @@ async def fetch_data_node(state: AgentState) -> dict:
                 )
             )
 
-        # Load beauty profile for the user (for Artist Agent — populated now for future use)
+        # Load beauty profile for the user (Artist Agent input)
         bp_result = await db.execute(
             select(BeautyProfile).where(BeautyProfile.user_id == state.user_id)
         )
@@ -102,18 +103,29 @@ async def chemist_node(state: AgentState) -> dict:
         return {"errors": [*state.errors, f"chemist: {exc}"]}
 
 
+async def artist_node(state: AgentState) -> dict:
+    """Run aesthetic harmony analysis against the user's beauty profile."""
+    try:
+        output = await run_artist_analysis(state.products, state.beauty_profile)
+        errors = list(state.errors)
+        if output.quota_exceeded:
+            errors.append("quota_exceeded")
+        return {"artist_results": output.results, "errors": errors}
+    except Exception as exc:
+        logger.error("Artist agent failed: %s", exc)
+        return {"errors": [*state.errors, f"artist: {exc}"]}
+
+
 # ---------------------------------------------------------------------------
-# Stub comment — Artist and Trend nodes plug in here (Phase 4):
-#
-# async def artist_node(state: AgentState) -> dict:
-#     from app.agents.artist_agent import run_artist_analysis
-#     output = await run_artist_analysis(state.products, state.beauty_profile)
-#     return {"artist_results": output.results}
+# Stub — Trend node plugs in here (Phase 3):
 #
 # async def trend_node(state: AgentState) -> dict:
 #     from app.agents.trend_agent import run_trend_analysis
 #     output = await run_trend_analysis(state.products, state.active_trends)
-#     return {"trend_results": output.results}
+#     errors = list(state.errors)
+#     if output.quota_exceeded:
+#         errors.append("quota_exceeded")
+#     return {"trend_results": output.results, "errors": errors}
 # ---------------------------------------------------------------------------
 
 
@@ -124,10 +136,19 @@ async def aggregate_node(state: AgentState) -> dict:
     """
     from app.models.compatibility import CompatibilityResult
 
-    # Merge results from all agents (artist/trend are empty dicts in Phase 1)
-    compatibility_map = {}
+    # Merge results from all agents (trend is empty dict in Phase 2)
+    compatibility_map: dict = {}
     compatibility_map.update(state.chemist_results)
-    compatibility_map.update(state.artist_results)
+    # Artist results fill in products not already flagged by chemist;
+    # if both agents flag the same product, chemist (formulation conflict) wins.
+    for pid, resp in state.artist_results.items():
+        if pid not in compatibility_map:
+            compatibility_map[pid] = resp
+        else:
+            # Escalate to error if artist found a harder conflict on a warned product
+            existing = compatibility_map[pid]
+            if resp.severity == "error" and existing.severity == "warning":
+                compatibility_map[pid] = resp
     compatibility_map.update(state.trend_results)
 
     # Compute overall score
@@ -143,7 +164,7 @@ async def aggregate_node(state: AgentState) -> dict:
         compatibility_map=compatibility_map,
         evaluated_at=now,
         overall_compatibility_score=round(score, 4),
-        errors=state.errors,
+        errors=list(dict.fromkeys(state.errors)),  # deduplicate while preserving order
     )
 
     # Compute fingerprint for cache keying
@@ -179,20 +200,21 @@ _builder = StateGraph(AgentState)
 
 _builder.add_node("fetch_data", fetch_data_node)
 _builder.add_node("chemist", chemist_node)
+_builder.add_node("artist", artist_node)
 _builder.add_node("aggregate", aggregate_node)
 
-# Phase 1 linear graph:  START → fetch_data → chemist → aggregate → END
+# Phase 2 parallel graph:
+#   START → fetch_data → [chemist, artist] → aggregate → END
 _builder.add_edge(START, "fetch_data")
 _builder.add_edge("fetch_data", "chemist")
+_builder.add_edge("fetch_data", "artist")
 _builder.add_edge("chemist", "aggregate")
+_builder.add_edge("artist", "aggregate")
 _builder.add_edge("aggregate", END)
 
-# Phase 4: artist + trend nodes will be wired in parallel after fetch_data:
-# _builder.add_node("artist", artist_node)
+# Phase 3: trend node wires in here alongside chemist and artist:
 # _builder.add_node("trend", trend_node)
-# _builder.add_edge("fetch_data", "artist")
 # _builder.add_edge("fetch_data", "trend")
-# _builder.add_edge("artist", "aggregate")
 # _builder.add_edge("trend", "aggregate")
 
 compatibility_graph = _builder.compile()

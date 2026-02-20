@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import operator
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -129,8 +130,9 @@ class AgentState(BaseModel):
     # Final merged output — set by aggregate_node, read by API endpoint
     final_output: OrchestratorOutput | None = None
 
-    # Error tracking
-    errors: list[str] = Field(default_factory=list)
+    # Error tracking — Annotated with operator.add so parallel nodes can each append
+    # without triggering LangGraph's INVALID_CONCURRENT_GRAPH_UPDATE error.
+    errors: Annotated[list[str], operator.add] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +175,10 @@ class ArtistInput(BaseModel):
 
 class ArtistOutput(BaseModel):
     results: dict[str, CompatibilityResponse]
+    quota_exceeded: bool = Field(
+        default=False,
+        description="True when the LLM call failed with a 429 quota/rate-limit error",
+    )
 
 
 # ---------------------------------------------------------------------------
