@@ -77,6 +77,7 @@ async def analyze_compatibility(
                 "user_id": body.user_id,
                 "product_ids": body.product_ids,
                 "trigger_product_id": body.trigger_product_id,
+                "beauty_profile": body.beauty_profile,
             }
         )
     except Exception as exc:

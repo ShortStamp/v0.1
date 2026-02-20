@@ -48,6 +48,9 @@ class OrchestratorInput(BaseModel):
     product_ids: list[str]
     # The product that was just added (triggers re-evaluation of this product only)
     trigger_product_id: str | None = None
+    # Optional inline beauty profile — when provided, skips the DB lookup so
+    # unauthenticated / guest users still get Artist Agent analysis.
+    beauty_profile: BeautyProfileSnapshot | None = None
 
 
 class OrchestratorOutput(BaseModel):

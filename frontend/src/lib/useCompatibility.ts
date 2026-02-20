@@ -39,6 +39,23 @@ export function useCompatibility(filledSlots: Record<string, string>) {
     setIsAnalyzing(true);
     setQuotaExceeded(false);
 
+    // Read beauty profile from localStorage for Artist Agent analysis
+    const beautyProfile = (() => {
+      try {
+        const raw = localStorage.getItem("beautyProfile");
+        if (!raw) return null;
+        const p = JSON.parse(raw);
+        return {
+          skin_tone: p.skinTone || null,
+          undertone: p.undertone || null,
+          skin_type: p.skinType || null,
+          coverage: p.coverage || null,
+          finish: p.finish || null,
+          budget: p.budget || null,
+        };
+      } catch { return null; }
+    })();
+
     fetch("/api/v1/compatibility/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -46,6 +63,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
         build_id: "local-build",
         user_id: "local-user",
         product_ids: productIds,
+        beauty_profile: beautyProfile,
       }),
     })
       .then((res) => {

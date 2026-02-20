@@ -184,6 +184,23 @@ export default function CategoryPage() {
       return;
     }
 
+    // Read beauty profile from localStorage for Artist Agent analysis
+    const storedProfile = (() => {
+      try {
+        const raw = localStorage.getItem("beautyProfile");
+        if (!raw) return null;
+        const p = JSON.parse(raw);
+        return {
+          skin_tone: p.skinTone || null,
+          undertone: p.undertone || null,
+          skin_type: p.skinType || null,
+          coverage: p.coverage || null,
+          finish: p.finish || null,
+          budget: p.budget || null,
+        };
+      } catch { return null; }
+    })();
+
     compatTimerRef.current = setTimeout(() => {
       let cancelled = false;
       setIsAnalyzing(true);
@@ -195,6 +212,7 @@ export default function CategoryPage() {
           build_id: "local-build",
           user_id: "local-user",
           product_ids: allIds,
+          beauty_profile: storedProfile,
         }),
       })
         .then((res) => {
@@ -440,15 +458,17 @@ export default function CategoryPage() {
                                     </span>
                                   )}
                                   {hasConflict && (
-                                    <span
-                                      className={`mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 ${isError ? "bg-foreground" : "border border-foreground/50"}`}
-                                      title={compat.reason}
-                                    >
-                                      <span className={`text-[7px] font-bold uppercase tracking-[0.1em] ${isError ? "text-white" : "text-foreground"}`}>
-                                        {isError ? "✕ conflict" : "! warning"}
+                                    <span className="group relative mt-1 inline-block cursor-default">
+                                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 ${isError ? "bg-foreground" : "border border-foreground/50"}`}>
+                                        <span className={`text-[7px] font-bold uppercase tracking-[0.1em] ${isError ? "text-white" : "text-foreground"}`}>
+                                          {isError ? "✕ conflict" : "! warning"}
+                                        </span>
+                                        <span className={`text-[6px] font-medium uppercase tracking-widest ${isError ? "text-white/40" : "text-foreground/30"}`}>
+                                          {compat.sourceAgent === "artist" ? "✦ artist" : "⚗ chemist"}
+                                        </span>
                                       </span>
-                                      <span className={`text-[6px] font-medium uppercase tracking-widest ${isError ? "text-white/40" : "text-foreground/30"}`}>
-                                        ⚗ chemist
+                                      <span className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 hidden w-52 border border-border bg-background p-2 shadow-lg group-hover:block">
+                                        <span className="block text-[10px] font-medium leading-snug text-foreground">{compat.reason}</span>
                                       </span>
                                     </span>
                                   )}
@@ -556,14 +576,16 @@ export default function CategoryPage() {
                             </div>
                           )}
                           {hasConflict && (
-                            <div
-                              className={`absolute inset-x-0 top-0 z-10 px-1.5 py-1 ${isError ? "bg-foreground" : "bg-foreground/80"}`}
-                              title={compat.reason}
-                            >
+                            <div className={`group absolute inset-x-0 top-0 z-10 cursor-default px-1.5 py-1 ${isError ? "bg-foreground" : "bg-foreground/80"}`}>
                               <p className="text-[7px] font-bold uppercase tracking-[0.1em] text-white">
                                 {isError ? "✕ conflict" : "! warning"}
                               </p>
-                              <p className="text-[6px] font-medium uppercase tracking-widest text-white/40">⚗ chemist agent</p>
+                              <p className="text-[6px] font-medium uppercase tracking-widest text-white/40">
+                                {compat.sourceAgent === "artist" ? "✦ artist" : "⚗ chemist"}
+                              </p>
+                              <div className="pointer-events-none absolute inset-x-0 top-full z-50 mt-px hidden border border-border bg-background p-2 shadow-lg group-hover:block">
+                                <p className="text-[10px] font-medium leading-snug text-foreground">{compat.reason}</p>
+                              </div>
                             </div>
                           )}
                         </div>

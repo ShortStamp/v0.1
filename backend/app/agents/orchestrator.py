@@ -24,6 +24,7 @@ from app.database import async_session
 from app.schemas.compatibility import (
     AgentState,
     BeautyProfileSnapshot,
+    OrchestratorInput,
     OrchestratorOutput,
     ProductSnapshot,
 )
@@ -72,20 +73,25 @@ async def fetch_data_node(state: AgentState) -> dict:
                 )
             )
 
-        # Load beauty profile for the user (Artist Agent input)
-        bp_result = await db.execute(
-            select(BeautyProfile).where(BeautyProfile.user_id == state.user_id)
-        )
-        bp = bp_result.scalar_one_or_none()
-        if bp:
-            beauty_profile = BeautyProfileSnapshot(
-                skin_tone=getattr(bp, "skin_tone", None),
-                undertone=getattr(bp, "undertone", None),
-                skin_type=getattr(bp, "skin_type", None),
-                coverage=getattr(bp, "coverage", None),
-                finish=getattr(bp, "finish", None),
-                budget=getattr(bp, "budget", None),
+        # Load beauty profile for the user (Artist Agent input).
+        # If an inline profile was passed in the request, use it directly
+        # so guest / unauthenticated users still get Artist Agent analysis.
+        if state.beauty_profile is not None:
+            beauty_profile = state.beauty_profile
+        else:
+            bp_result = await db.execute(
+                select(BeautyProfile).where(BeautyProfile.user_id == state.user_id)
             )
+            bp = bp_result.scalar_one_or_none()
+            if bp:
+                beauty_profile = BeautyProfileSnapshot(
+                    skin_tone=getattr(bp, "skin_tone", None),
+                    undertone=getattr(bp, "undertone", None),
+                    skin_type=getattr(bp, "skin_type", None),
+                    coverage=getattr(bp, "coverage", None),
+                    finish=getattr(bp, "finish", None),
+                    budget=getattr(bp, "budget", None),
+                )
 
     return {"products": products, "beauty_profile": beauty_profile}
 

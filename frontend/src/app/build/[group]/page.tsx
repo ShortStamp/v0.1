@@ -194,10 +194,9 @@ export default function GroupPage() {
                     const isError = compat.severity === "error";
                     return (
                       <div
-                        className={`mt-2 w-full px-1.5 py-1 ${
+                        className={`group relative mt-2 w-full cursor-default px-1.5 py-1 ${
                           isError ? "bg-foreground" : "border border-foreground/50"
                         }`}
-                        title={compat.reason}
                       >
                         <p
                           className={`text-[8px] font-bold uppercase leading-tight tracking-[0.08em] ${
@@ -211,8 +210,11 @@ export default function GroupPage() {
                             isError ? "text-white/40" : "text-foreground/30"
                           }`}
                         >
-                          ⚗ chemist agent
+                          {compat.sourceAgent === "artist" ? "✦ artist" : "⚗ chemist"}
                         </p>
+                        <div className="pointer-events-none absolute inset-x-0 top-full z-50 mt-px hidden border border-border bg-background p-2 shadow-lg group-hover:block">
+                          <p className="text-[10px] font-medium leading-snug text-foreground">{compat.reason}</p>
+                        </div>
                       </div>
                     );
                   })()}
