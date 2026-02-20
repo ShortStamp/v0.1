@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CategoryKey } from "@/types";
 import { categoryGroups } from "@/lib/data";
 import { readBuildSlots } from "@/lib/buildSlots";
+import { useCompatibility } from "@/lib/useCompatibility";
 import {
   Droplets,
   Eye,
@@ -38,6 +39,8 @@ export default function BuildPage() {
     setFilledSlots(readBuildSlots());
     setLoading(false);
   }, [router]);
+
+  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlots);
 
   const totalCategories = categoryGroups.reduce((sum, g) => sum + g.categories.length, 0);
   const totalFilled = Object.keys(filledSlots).length;
@@ -101,6 +104,16 @@ export default function BuildPage() {
             const total = group.categories.length;
             const isComplete = filled === total && total > 0;
 
+            // Tally conflicts in this group from the compatibility map
+            const groupConflicts = group.categories
+              .map((cat) => filledSlots[cat])
+              .filter((pid) => pid && compatibilityMap[pid] && !compatibilityMap[pid].isCompatible);
+            const errorCount = groupConflicts.filter(
+              (pid) => compatibilityMap[pid]?.severity === "error"
+            ).length;
+            const conflictCount = groupConflicts.length;
+            const worstSeverity = errorCount > 0 ? "error" : conflictCount > 0 ? "warning" : null;
+
             return (
               <Link
                 key={group.key}
@@ -139,6 +152,111 @@ export default function BuildPage() {
                 >
                   {group.categories.length} {group.categories.length === 1 ? "category" : "categories"}
                 </p>
+
+                {/* Quota error badge (shown when Gemini API returns 429) */}
+                {quotaExceeded && filled > 0 && (
+                  <div className="mb-3">
+                    <div
+                      className={`inline-flex items-center gap-1.5 border px-2 py-0.5 ${
+                        isComplete ? "border-white/30 bg-white/10" : "border-foreground bg-foreground"
+                      }`}
+                    >
+                      <span
+                        className={`text-[9px] font-bold uppercase tracking-[0.12em] ${
+                          isComplete ? "text-white" : "text-white"
+                        }`}
+                      >
+                        ! API Quota Met
+                      </span>
+                      <span
+                        className={`text-[8px] font-medium uppercase tracking-widest ${
+                          isComplete ? "text-white/40" : "text-white/40"
+                        }`}
+                      >
+                        ⚗ chemist
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Conflict indicator (shown when chemist agent finds issues) */}
+                {!quotaExceeded && worstSeverity && (
+                  <div className="mb-3">
+                    <div
+                      className={`inline-flex items-center gap-1.5 border px-2 py-0.5 ${
+                        isComplete
+                          ? "border-white/30 bg-white/10"
+                          : worstSeverity === "error"
+                          ? "border-foreground bg-foreground"
+                          : "border-foreground/40"
+                      }`}
+                    >
+                      <span
+                        className={`text-[9px] font-bold uppercase tracking-[0.12em] ${
+                          isComplete
+                            ? "text-white"
+                            : worstSeverity === "error"
+                            ? "text-white"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {worstSeverity === "error" ? "✕" : "!"}&nbsp;
+                        {conflictCount} conflict{conflictCount > 1 ? "s" : ""}
+                      </span>
+                      <span
+                        className={`text-[8px] font-medium uppercase tracking-widest ${
+                          isComplete
+                            ? "text-white/40"
+                            : worstSeverity === "error"
+                            ? "text-white/40"
+                            : "text-foreground/30"
+                        }`}
+                      >
+                        ⚗ chemist
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Analyzing indicator */}
+                {isAnalyzing && filled > 0 && !worstSeverity && (
+                  <p
+                    className={`mb-3 text-[8px] font-medium uppercase tracking-widest ${
+                      isComplete ? "text-white/30" : "text-foreground/20"
+                    }`}
+                  >
+                    ⚗ analyzing…
+                  </p>
+                )}
+
+                {/* Compatible badge — all filled products in this group analyzed with no conflicts */}
+                {!quotaExceeded && !isAnalyzing && !worstSeverity && filled > 0 &&
+                  group.categories
+                    .filter((cat) => filledSlots[cat])
+                    .every((cat) => analyzedIds.has(filledSlots[cat])) && (
+                  <div className="mb-3">
+                    <div
+                      className={`inline-flex items-center gap-1.5 border px-2 py-0.5 ${
+                        isComplete ? "border-white/20" : "border-foreground/15"
+                      }`}
+                    >
+                      <span
+                        className={`text-[9px] font-bold uppercase tracking-[0.12em] ${
+                          isComplete ? "text-white/50" : "text-foreground/35"
+                        }`}
+                      >
+                        ✓ compatible
+                      </span>
+                      <span
+                        className={`text-[8px] font-medium uppercase tracking-widest ${
+                          isComplete ? "text-white/25" : "text-foreground/20"
+                        }`}
+                      >
+                        ⚗ chemist
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Fill count bar */}
                 <div className="mt-auto">

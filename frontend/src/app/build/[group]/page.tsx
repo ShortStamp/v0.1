@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CategoryKey, ToolboxSlot, Product } from "@/types";
 import { categoryDefinitions, categoryGroups } from "@/lib/data";
+import { readBuildSlots, removeBuildSlot, readBuildProductCache } from "@/lib/buildSlots";
 import {
   ArrowLeft,
   Plus,
@@ -30,6 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
+import { useCompatibility } from "@/lib/useCompatibility";
 
 const categoryIcons: Record<CategoryKey, LucideIcon> = {
   foundation: Droplets,
@@ -59,21 +61,14 @@ const initialSlots: ToolboxSlot[] = categoryDefinitions.map((c) => ({
 
 function loadSlots(): ToolboxSlot[] {
   if (typeof window === "undefined") return initialSlots;
-  try {
-    const raw = localStorage.getItem("buildSlots");
-    if (!raw) return initialSlots;
-    const saved: ToolboxSlot[] = JSON.parse(raw);
-    return initialSlots.map((slot) => {
-      const match = saved.find((s) => s.category === slot.category);
-      return match ? match : slot;
-    });
-  } catch {
-    return initialSlots;
-  }
-}
-
-function saveSlots(slots: ToolboxSlot[]) {
-  localStorage.setItem("buildSlots", JSON.stringify(slots));
+  const flatSlots = readBuildSlots();         // Record<categoryKey, productId>
+  const productCache = readBuildProductCache(); // Record<productId, Product>
+  return initialSlots.map((slot) => {
+    const productId = flatSlots[slot.category];
+    if (!productId) return { ...slot, product: null };
+    const product = productCache[productId] ?? null;
+    return { ...slot, product };
+  });
 }
 
 export default function GroupPage() {
@@ -88,14 +83,19 @@ export default function GroupPage() {
     setSlots(loadSlots());
   }, []);
 
+  // Build filledSlots map (category → productId) for the compatibility hook
+  const filledSlotsForCompat = Object.fromEntries(
+    slots.filter((s) => s.product).map((s) => [s.category, s.product!.id])
+  );
+  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlotsForCompat);
+
   const handleRemove = (category: CategoryKey) => {
-    setSlots((prev) => {
-      const updated = prev.map((slot) =>
+    removeBuildSlot(category);
+    setSlots((prev) =>
+      prev.map((slot) =>
         slot.category === category ? { ...slot, product: null } : slot
-      );
-      saveSlots(updated);
-      return updated;
-    });
+      )
+    );
   };
 
   const lowestPrice = (p: Product) => getBestOfferForProduct(p)?.price ?? 0;
@@ -177,6 +177,65 @@ export default function GroupPage() {
                 <>
                   <p className="text-xs text-foreground/40">{getDisplayBrand(slot.product!.brand)}</p>
                   <p className="text-sm font-medium leading-snug">{getDisplayName(slot.product!.name)}</p>
+
+                  {/* Chemist agent badges */}
+                  {quotaExceeded ? (
+                    <div className="mt-2 w-full bg-foreground px-1.5 py-1">
+                      <p className="text-[8px] font-bold uppercase leading-tight tracking-[0.08em] text-white">
+                        ! API Quota Met
+                      </p>
+                      <p className="text-[7px] font-medium uppercase tracking-widest text-white/40">
+                        ⚗ chemist agent
+                      </p>
+                    </div>
+                  ) : (() => {
+                    const compat = compatibilityMap[slot.product!.id];
+                    if (!compat) return null;
+                    const isError = compat.severity === "error";
+                    return (
+                      <div
+                        className={`mt-2 w-full px-1.5 py-1 ${
+                          isError ? "bg-foreground" : "border border-foreground/50"
+                        }`}
+                        title={compat.reason}
+                      >
+                        <p
+                          className={`text-[8px] font-bold uppercase leading-tight tracking-[0.08em] ${
+                            isError ? "text-white" : "text-foreground"
+                          }`}
+                        >
+                          {isError ? "✕ conflict" : "! warning"}
+                        </p>
+                        <p
+                          className={`text-[7px] font-medium uppercase tracking-widest ${
+                            isError ? "text-white/40" : "text-foreground/30"
+                          }`}
+                        >
+                          ⚗ chemist agent
+                        </p>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Analyzing shimmer — shown while waiting for results */}
+                  {!quotaExceeded && isAnalyzing && !compatibilityMap[slot.product!.id] && (
+                    <p className="mt-2 text-[7px] font-medium uppercase tracking-widest text-foreground/20">
+                      ⚗ analyzing…
+                    </p>
+                  )}
+
+                  {/* Compatible badge — shown when ChemAI has analyzed this product and found no issues */}
+                  {!quotaExceeded && !isAnalyzing && analyzedIds.has(slot.product!.id) && !compatibilityMap[slot.product!.id] && (
+                    <div className="mt-2 w-full border border-foreground/15 px-1.5 py-1">
+                      <p className="text-[8px] font-bold uppercase leading-tight tracking-[0.08em] text-foreground/30">
+                        ✓ compatible
+                      </p>
+                      <p className="text-[7px] font-medium uppercase tracking-widest text-foreground/20">
+                        ⚗ chemist agent
+                      </p>
+                    </div>
+                  )}
+
                   <p className="mt-auto pt-2 text-base font-bold text-foreground">
                     {formatPrice(lowestPrice(slot.product!))}
                   </p>

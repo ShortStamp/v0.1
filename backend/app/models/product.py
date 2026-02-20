@@ -28,6 +28,9 @@ class Product(Base, TimestampMixin):
     image_url: Mapped[str] = mapped_column(String(500), default="/placeholder-product.jpg")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     specs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    inci_ingredients: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True, comment="INCI ingredient list from Open Beauty Facts"
+    )
     stamp_score: Mapped[int] = mapped_column(Integer, default=0)
     upc: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True, index=True)
     amazon_asin: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)

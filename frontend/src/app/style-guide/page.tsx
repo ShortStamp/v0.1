@@ -243,6 +243,132 @@ export default function StyleGuidePage() {
           </div>
         </Section>
 
+        <Section title="Font A/B Test" demo={false}>
+          <p className="mb-5 text-sm text-foreground/60">
+            Each card renders identical copy in a different typeface. Compare display heading, body
+            paragraph, and UI label behaviour side-by-side.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                id: 'helvetica',
+                label: 'Helvetica Neue',
+                sub: 'System sans-serif · current default',
+                style: { fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' },
+              },
+              {
+                id: 'montserrat',
+                label: 'Montserrat',
+                sub: 'Geometric sans · beauty-brand staple',
+                style: { fontFamily: '"Montserrat", sans-serif' },
+              },
+              {
+                id: 'josefin',
+                label: 'Josefin Sans',
+                sub: 'Geometric uppercase · editorial clean',
+                style: { fontFamily: '"Josefin Sans", sans-serif' },
+              },
+              {
+                id: 'raleway',
+                label: 'Raleway',
+                sub: 'Thin elegant sans · airy luxury',
+                style: { fontFamily: '"Raleway", sans-serif' },
+              },
+              {
+                id: 'playfair',
+                label: 'Playfair Display',
+                sub: 'High-contrast serif · fashion editorial',
+                style: { fontFamily: '"Playfair Display", serif' },
+              },
+              {
+                id: 'cormorant',
+                label: 'Cormorant Garamond',
+                sub: 'Ultra-fine serif · Vogue / Chanel tier',
+                style: { fontFamily: '"Cormorant Garamond", serif' },
+              },
+              {
+                id: 'dm-serif',
+                label: 'DM Serif Display',
+                sub: 'Ink-trap serif · bold editorial',
+                style: { fontFamily: '"DM Serif Display", serif' },
+              },
+              {
+                id: 'libre',
+                label: 'Libre Baskerville',
+                sub: 'Classic book serif · trustworthy warmth',
+                style: { fontFamily: '"Libre Baskerville", serif' },
+              },
+            ].map((font) => (
+              <div
+                key={font.id}
+                className="rounded-xl border border-border bg-background p-5 space-y-4"
+                style={font.style}
+              >
+                <div className="border-b border-border pb-3">
+                  <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-foreground/40 mb-1">
+                    {font.label}
+                  </p>
+                  <p className="text-[10px] font-sans text-foreground/30">{font.sub}</p>
+                </div>
+
+                {/* Display / Hero */}
+                <div>
+                  <p className="text-[9px] font-sans uppercase tracking-[0.1em] text-foreground/40 mb-1">
+                    Display
+                  </p>
+                  <p className="text-3xl font-bold leading-tight">ShortStamp</p>
+                  <p className="text-lg font-light tracking-wide">Makeup</p>
+                </div>
+
+                {/* Section heading */}
+                <div>
+                  <p className="text-[9px] font-sans uppercase tracking-[0.1em] text-foreground/40 mb-1">
+                    Heading
+                  </p>
+                  <p className="text-base font-semibold leading-snug">
+                    Your perfect foundation, found.
+                  </p>
+                </div>
+
+                {/* Body */}
+                <div>
+                  <p className="text-[9px] font-sans uppercase tracking-[0.1em] text-foreground/40 mb-1">
+                    Body
+                  </p>
+                  <p className="text-sm leading-relaxed text-foreground/70">
+                    Medium coverage with a satin finish. Dermatologist-tested and cruelty-free.
+                    Blends quickly and lasts all day.
+                  </p>
+                </div>
+
+                {/* UI label */}
+                <div>
+                  <p className="text-[9px] font-sans uppercase tracking-[0.1em] text-foreground/40 mb-1">
+                    UI Label
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] bg-foreground text-background px-3 py-1.5 rounded">
+                      Add to Build
+                    </span>
+                    <span className="text-xs font-medium uppercase tracking-[0.14em] border border-foreground px-3 py-1.5 rounded">
+                      View All
+                    </span>
+                  </div>
+                </div>
+
+                {/* Price / metadata */}
+                <div>
+                  <p className="text-[9px] font-sans uppercase tracking-[0.1em] text-foreground/40 mb-1">
+                    Metadata
+                  </p>
+                  <p className="text-lg font-bold">$42.00</p>
+                  <p className="text-xs text-foreground/50 tracking-wide">Stamp Score · 92</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
         <Section title="Interaction Policy" demo={false}>
           <div className="space-y-3">
             <p className="text-sm text-foreground/60">
@@ -253,6 +379,8 @@ export default function StyleGuidePage() {
       </div>
 
       <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Josefin+Sans:wght@300;400;600;700&family=Raleway:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Serif+Display&family=Libre+Baskerville:wght@400;700&display=swap');
+
         .style-preview a {
           pointer-events: none;
           cursor: default;

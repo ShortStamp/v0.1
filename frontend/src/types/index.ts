@@ -90,3 +90,13 @@ export interface BeautyProfile {
   finish: string;
   budget: string;
 }
+
+export interface CompatibilityInfo {
+  isCompatible: boolean;
+  reason: string;
+  severity: "warning" | "error";
+  sourceAgent: string;
+  conflictingProductIds: string[];
+}
+
+export type CompatibilityMap = Record<string, CompatibilityInfo>;

@@ -1,0 +1,41 @@
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base, TimestampMixin
+
+
+class CompatibilityResult(Base, TimestampMixin):
+    """
+    Cached result of the compatibility analysis graph for a product in a build.
+
+    Keyed by build_fingerprint (SHA-256 of sorted product_id list).
+    The API endpoint checks this table before invoking the LangGraph graph.
+    """
+    __tablename__ = "compatibility_results"
+    __table_args__ = (
+        Index("ix_compatibility_results_fingerprint", "build_fingerprint"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # FK to builds.id — not enforced by SQLite but respected in PostgreSQL
+    build_id: Mapped[str] = mapped_column(
+        ForeignKey("builds.id"), index=True
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id"), index=True
+    )
+    is_compatible: Mapped[bool]
+    reason: Mapped[str] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(10))   # 'warning' | 'error'
+    source_agent: Mapped[str] = mapped_column(String(20))
+    conflicting_product_ids: Mapped[list[str]] = mapped_column(JSON)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    build_fingerprint: Mapped[str] = mapped_column(
+        String(64),
+        comment="SHA-256 of sorted product_ids; cache invalidation key",
+    )
+
+    # Read-only relationships (no back_populates to avoid modifying existing models)
+    product: Mapped["Product"] = relationship(viewonly=True)  # noqa: F821

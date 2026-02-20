@@ -10,6 +10,8 @@
   --border: #E0E0E0;
   --pink-deep: #000000;
   --pink-soft: #F0F0F0;
+  /* Override Tailwind v4 preflight — it reads --default-font-family, not --font-sans */
+  --default-font-family: var(--font-libre-baskerville), "Libre Baskerville", Georgia, serif;
 }
 
 @theme inline {
@@ -22,14 +24,18 @@
   --color-border: var(--border);
   --color-pink-deep: var(--pink-deep);
   --color-pink-soft: var(--pink-soft);
-  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-libre-baskerville), "Libre Baskerville", Georgia, serif;
   --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  font-family: var(--font-libre-baskerville), "Libre Baskerville", Georgia, serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
