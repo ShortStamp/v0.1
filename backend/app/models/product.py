@@ -38,6 +38,8 @@ class Product(Base, TimestampMixin):
     source: Mapped[str] = mapped_column(String(50), default="manual_seed")
     source_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     walmart_item_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    sephora_product_id: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    extra_image_urls: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -47,6 +49,7 @@ class Product(Base, TimestampMixin):
     filter_values: Mapped[list["ProductFilterValue"]] = relationship(back_populates="product")
     prices: Mapped[list["ProductPrice"]] = relationship(back_populates="product")
     reviews: Mapped[list["ProductReview"]] = relationship(back_populates="product")
+    variants: Mapped[list["ProductVariant"]] = relationship(back_populates="product")
 
 
 class ProductFilterValue(Base):
@@ -122,3 +125,22 @@ class ProductReview(Base, TimestampMixin):
     )
 
     product: Mapped["Product"] = relationship(back_populates="reviews")
+
+
+class ProductVariant(Base, TimestampMixin):
+    __tablename__ = "product_variants"
+    __table_args__ = (
+        UniqueConstraint("product_id", "external_sku_id", name="uq_variant_sku"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    source: Mapped[str] = mapped_column(String(50), default="sephora")
+    external_sku_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    shade_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    hex_color: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    product: Mapped["Product"] = relationship(back_populates="variants")

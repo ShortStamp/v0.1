@@ -95,6 +95,11 @@ async def _upsert_price(
     # Store walmart_item_id on the product if not already set
     if not product.walmart_item_id:
         product.walmart_item_id = item.item_id
+    
+    # Update product image if we have a new one and the current one is poor quality
+    if item.image_url:
+        # Walmart images are high quality, prioritize them
+        product.image_url = item.image_url
 
     return True
 

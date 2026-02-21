@@ -27,6 +27,7 @@ def _make_scheduler() -> AsyncIOScheduler:
     from app.ingestion.open_beauty_facts import run_ingestion as run_obf
     from app.ingestion.retailer_scrape import run_ingestion as run_retailer_scrape
     from app.ingestion.score_calculator import run_ingestion as run_scores
+    from app.ingestion.sephora_scraper import run_ingestion as run_sephora
     from app.ingestion.walmart_affiliate import run_ingestion as run_walmart
 
     scheduler = AsyncIOScheduler(timezone="UTC")
@@ -47,6 +48,16 @@ def _make_scheduler() -> AsyncIOScheduler:
         hours=12,
         id="retailer_scrape",
         name="Retailer product/link scraping (Amazon/Sephora/Ulta)",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_sephora,
+        "cron",
+        hour=3,
+        minute=30,
+        id="sephora_scrape",
+        name="Sephora dedicated category scraper",
         replace_existing=True,
     )
 
@@ -85,7 +96,7 @@ def start_scheduler() -> None:
 
     _scheduler = _make_scheduler()
     _scheduler.start()
-    logger.info("Ingestion scheduler started (4 jobs registered, timezone=UTC)")
+    logger.info("Ingestion scheduler started (5 jobs registered, timezone=UTC)")
 
 
 def stop_scheduler() -> None:
