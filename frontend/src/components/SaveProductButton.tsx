@@ -13,20 +13,12 @@ interface SaveProductButtonProps {
 
 export default function SaveProductButton({ productId, category }: SaveProductButtonProps) {
   const router = useRouter();
-  const [saved, setSaved] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const slots = readBuildSlots();
-    return slots[category] === productId;
-  });
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const slots = readBuildSlots();
-    const isCurrentlySaved = slots[category] === productId;
-    if (saved !== isCurrentlySaved) {
-      setSaved(isCurrentlySaved);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId, category, saved]);
+    setSaved(slots[category] === productId);
+  }, [productId, category]);
 
   const handleSave = () => {
     saveBuildSlot(category, productId);

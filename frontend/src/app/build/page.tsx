@@ -26,13 +26,14 @@ const groupIcons: Record<string, LucideIcon> = {
 
 export default function BuildPage() {
   const router = useRouter();
-  const [filledSlots] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    return readBuildSlots();
-  });
+  const [hasMounted, setHasMounted] = useState(false);
+  const [filledSlots, setFilledSlots] = useState<Record<string, string>>({});
   const [isLoadingQuizRedirect, setIsLoadingQuizRedirect] = useState(false); // New state for quiz redirect loading
 
   useEffect(() => {
+    setHasMounted(true);
+    setFilledSlots(readBuildSlots());
+    
     const saved = localStorage.getItem("beautyProfile");
     if (!saved) {
       setIsLoadingQuizRedirect(true); // Indicate loading while redirecting
@@ -44,7 +45,7 @@ export default function BuildPage() {
   const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlots);
 
   const totalCategories = categoryGroups.reduce((sum, g) => sum + g.categories.length, 0);
-  const totalFilled = Object.keys(filledSlots).length;
+  const totalFilled = hasMounted ? Object.keys(filledSlots).length : 0;
 
   if (isLoadingQuizRedirect) {
     return (
