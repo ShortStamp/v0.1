@@ -105,7 +105,7 @@ interface ProductFilterPropertiesResponse {
 }
 
 interface AuthResponse {
-  user: { id: string; email: string; display_name: string | null };
+  user: { id: string; email: string; display_name: string | null; is_admin: boolean };
   access_token: string;
   refresh_token: string;
 }
@@ -145,7 +145,14 @@ class ApiClient {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.detail || `API error: ${res.status}`);
+      const detail = body.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+          ? detail.map((d: { msg?: string }) => d.msg ?? String(d)).join(", ")
+          : `API error: ${res.status}`;
+      throw new Error(message);
     }
 
     return res.json();

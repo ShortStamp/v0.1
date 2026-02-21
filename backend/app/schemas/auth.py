@@ -8,7 +8,7 @@ class SignupRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -27,6 +27,7 @@ class UserResponse(BaseModel):
     email: str
     display_name: str | None = None
     avatar_url: str | None = None
+    is_admin: bool = False
 
     model_config = {"from_attributes": True}
 
