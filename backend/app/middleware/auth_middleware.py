@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import User
 from app.services.auth_service import decode_access_token
-from app.utils.exceptions import UnauthorizedError
+from app.utils.exceptions import ForbiddenError, UnauthorizedError
 
 security = HTTPBearer()
 
@@ -20,6 +20,12 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user:
         raise UnauthorizedError()
+    return user
+
+
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not user.is_admin:
+        raise ForbiddenError()
     return user
 
 
