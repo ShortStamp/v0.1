@@ -22,15 +22,17 @@ export default function ProfilePage() {
   const { isAuthenticated } = useAuth();
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(false);
-  const [beautyProfile, setBeautyProfile] = useState<BeautyProfile | null>(() => {
-    if (typeof window === "undefined") return null;
-    const local = localStorage.getItem("beautyProfile");
-    return local ? JSON.parse(local) : null;
-  });
+  const [beautyProfile, setBeautyProfile] = useState<BeautyProfile | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    // Load beauty profile from localStorage
+    const local = localStorage.getItem("beautyProfile");
+    if (local) {
+      setBeautyProfile(JSON.parse(local));
+    }
+
     // Load remote data if authenticated
     if (isAuthenticated) {
       (async () => {
