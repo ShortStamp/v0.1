@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CategoryKey, ToolboxSlot, Product } from "@/types";
@@ -77,7 +77,11 @@ export default function GroupPage() {
   const groupKey = params.group as string;
   const group = categoryGroups.find((g) => g.key === groupKey);
 
-  const [slots, setSlots] = useState<ToolboxSlot[]>(() => loadSlots());
+  const [slots, setSlots] = useState<ToolboxSlot[]>(initialSlots);
+
+  useEffect(() => {
+    setSlots(loadSlots());
+  }, []);
 
   // Build filledSlots map (category → productId) for the compatibility hook
   const filledSlotsForCompat = Object.fromEntries(

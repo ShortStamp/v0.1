@@ -9,7 +9,7 @@ import { getQuizAutoFilters } from "@/lib/personalization";
 import { X, Search, Star, Plus, LayoutGrid, List, Check, Loader2 } from "lucide-react";
 import AddToBagCard from "@/components/AddToBagCard";
 import { getProductColorInfo } from "@/lib/productColor";
-import { getBestOfferForProduct } from "@/lib/pricing";
+import { getBestOfferForProduct, getDisplayName } from "@/lib/pricing";
 
 type ViewMode = "tiles" | "list";
 

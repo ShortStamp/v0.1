@@ -48,3 +48,22 @@ export function removeBuildSlot(category: string): void {
   delete slots[category];
   localStorage.setItem("buildSlots", JSON.stringify(slots));
 }
+
+const PRODUCT_CACHE_KEY = "buildProductCache";
+
+export function readBuildProductCache(): Record<string, import("@/types").Product> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(PRODUCT_CACHE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+export function saveBuildProductToCache(productId: string, product: import("@/types").Product): void {
+  const cache = readBuildProductCache();
+  cache[productId] = product;
+  localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(cache));
+}

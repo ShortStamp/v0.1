@@ -286,18 +286,22 @@ export default function QuizPage() {
   // --- Auth Prompt screen ---
   if (done) {
     return (
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-background px-4">
-        <div className="w-full max-w-sm">
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-background px-4 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,var(--pink-soft),transparent_50%),radial-gradient(circle_at_bottom_left,var(--muted),transparent_50%)] opacity-70" />
+        <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-accent/5 blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-secondary/5 blur-3xl" />
+
+        <div className="relative z-10 w-full max-w-sm animate-pop-in">
           {/* Check icon */}
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center bg-foreground">
-            <Check className="h-8 w-8 text-white" />
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-accent">
+            <Check className="h-8 w-8" />
           </div>
 
           {/* Heading */}
-          <h1 className="mb-2 text-center text-xl font-bold uppercase tracking-[0.15em]">
-            SAVE YOUR RESULTS
+          <h1 className="mb-2 text-center text-xl font-bold uppercase tracking-[0.15em] font-serif">
+            Save Your Results
           </h1>
-          <p className="mb-8 text-center text-xs tracking-wide text-foreground/40">
+          <p className="mb-8 text-center text-xs tracking-wide text-foreground/40 font-sans">
             Create an account to save your beauty profile and builds.
           </p>
 
@@ -305,7 +309,7 @@ export default function QuizPage() {
           <button
             onClick={handleGoogleClick}
             disabled={authLoading}
-            className="mb-3 flex w-full items-center justify-center gap-3 border border-border bg-white px-4 py-3 text-xs font-medium uppercase tracking-[0.15em] text-foreground transition-all hover:border-foreground hover:shadow-md hover:shadow-black/5 disabled:opacity-50"
+            className="mb-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-border/50 bg-white px-4 py-3.5 text-xs font-bold uppercase tracking-[0.15em] text-foreground transition-all hover:border-accent hover:shadow-lg hover:shadow-accent/5 disabled:opacity-50 font-sans"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -313,25 +317,25 @@ export default function QuizPage() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
-            SIGN IN WITH GOOGLE
+            Sign in with Google
           </button>
 
           <button
             onClick={handleAppleClick}
             disabled={authLoading}
-            className="mb-6 flex w-full items-center justify-center gap-3 border border-border bg-white px-4 py-3 text-xs font-medium uppercase tracking-[0.15em] text-foreground transition-all hover:border-foreground hover:shadow-md hover:shadow-black/5 disabled:opacity-50"
+            className="mb-6 flex w-full items-center justify-center gap-3 rounded-2xl border border-border/50 bg-white px-4 py-3.5 text-xs font-bold uppercase tracking-[0.15em] text-foreground transition-all hover:border-accent hover:shadow-lg hover:shadow-accent/5 disabled:opacity-50 font-sans"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
               <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.53-3.23 0-1.44.62-2.2.44-3.06-.4C3.79 16.17 4.36 9.53 8.82 9.28c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.3 4.12zM12.03 9.2C11.88 6.88 13.76 5 15.96 4.82c.3 2.67-2.42 4.65-3.93 4.38z" />
             </svg>
-            SIGN IN WITH APPLE
+            Sign in with Apple
           </button>
 
           {/* Divider */}
           <div className="mb-6 flex items-center gap-4">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs tracking-wide text-foreground/30">OR</span>
-            <div className="h-px flex-1 bg-border" />
+            <div className="h-px flex-1 bg-border/50" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">or</span>
+            <div className="h-px flex-1 bg-border/50" />
           </div>
 
           {/* Email/Password form */}
@@ -342,7 +346,7 @@ export default function QuizPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="mb-3 w-full border border-border bg-white px-4 py-3 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-foreground"
+              className="mb-3 w-full rounded-2xl border border-border/50 bg-white px-5 py-3.5 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-all focus:border-accent focus:shadow-lg focus:shadow-accent/5 font-sans"
             />
             <input
               type="password"
@@ -351,23 +355,23 @@ export default function QuizPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="mb-4 w-full border border-border bg-white px-4 py-3 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-foreground"
+              className="mb-4 w-full rounded-2xl border border-border/50 bg-white px-5 py-3.5 text-xs tracking-wide text-foreground placeholder-foreground/30 outline-none transition-all focus:border-accent focus:shadow-lg focus:shadow-accent/5 font-sans"
             />
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full bg-foreground px-4 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-black/10 transition-all hover:shadow-xl disabled:opacity-50"
+              className="w-full rounded-2xl bg-accent px-4 py-3.5 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-xl shadow-accent/20 transition-all hover:bg-pink-deep hover:shadow-pink-deep/30 hover:-translate-y-0.5 disabled:opacity-50 font-sans"
             >
               {authMode === "signup" ? "CREATE ACCOUNT" : "LOG IN"}
             </button>
           </form>
 
           {authError && (
-            <p className="mb-4 text-center text-xs text-red-500">{authError}</p>
+            <p className="mb-4 text-center text-xs text-red-500 font-sans">{authError}</p>
           )}
 
           {/* Toggle signup/login */}
-          <p className="mb-6 text-center text-xs text-foreground/40">
+          <p className="mb-6 text-center text-xs text-foreground/40 font-sans">
             {authMode === "signup" ? (
               <>
                 Already have an account?{" "}
@@ -376,9 +380,9 @@ export default function QuizPage() {
                     setAuthMode("login");
                     setAuthError("");
                   }}
-                  className="font-medium uppercase tracking-wider text-foreground transition-opacity hover:opacity-70"
+                  className="font-bold uppercase tracking-wider text-accent transition-colors hover:text-pink-deep"
                 >
-                  LOG IN
+                  Log in
                 </button>
               </>
             ) : (
@@ -389,9 +393,9 @@ export default function QuizPage() {
                     setAuthMode("signup");
                     setAuthError("");
                   }}
-                  className="font-medium uppercase tracking-wider text-foreground transition-opacity hover:opacity-70"
+                  className="font-bold uppercase tracking-wider text-accent transition-colors hover:text-pink-deep"
                 >
-                  SIGN UP
+                  Sign up
                 </button>
               </>
             )}
@@ -400,9 +404,9 @@ export default function QuizPage() {
           {/* Skip */}
           <button
             onClick={handleSkip}
-            className="w-full py-2 text-center text-xs uppercase tracking-[0.15em] text-foreground/30 transition-colors hover:text-foreground/50"
+            className="w-full py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 transition-colors hover:text-accent font-sans"
           >
-            SKIP FOR NOW
+            Skip for now
           </button>
         </div>
       </div>
@@ -421,9 +425,9 @@ export default function QuizPage() {
   return (
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-background">
       {/* Progress bar */}
-      <div className="h-1 w-full shrink-0 bg-muted">
+      <div className="h-1.5 w-full shrink-0 overflow-hidden bg-muted">
         <div
-          className="h-1 bg-foreground transition-all duration-300 ease-out"
+          className="h-full bg-accent transition-all duration-500 ease-out"
           style={{ width: `${((step + 1) / total) * 100}%` }}
         />
       </div>
@@ -433,14 +437,14 @@ export default function QuizPage() {
         {step > 0 ? (
           <button
             onClick={goBack}
-            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.1em] text-foreground/40 transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-foreground/40 transition-colors hover:text-accent font-sans"
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
         ) : (
           <span />
         )}
-        <span className="text-xs font-medium uppercase tracking-[0.1em] text-foreground/30">
+        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-foreground/30 font-sans">
           {step + 1} of {total}
         </span>
       </div>
@@ -448,10 +452,10 @@ export default function QuizPage() {
       {/* Centered content */}
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6">
         {/* Question */}
-        <h1 className="mb-2 max-w-xl shrink-0 text-center text-2xl font-bold leading-snug sm:text-3xl">
+        <h1 className="mb-2 max-w-xl shrink-0 text-center text-2xl font-bold leading-snug font-serif sm:text-3xl">
           {question.title}
         </h1>
-        <p className="mb-8 max-w-md shrink-0 text-center text-sm text-foreground/40">
+        <p className="mb-8 max-w-md shrink-0 text-center text-sm text-foreground/40 font-sans">
           {question.subtitle}
         </p>
 
@@ -469,12 +473,12 @@ export default function QuizPage() {
                 key={opt.value}
                 onClick={() => advance(opt.value)}
                 disabled={selected !== null}
-                className={`group relative flex flex-col items-center justify-center gap-3 border px-4 py-5 text-center transition-all duration-200 ${
+                className={`group relative flex flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center transition-all duration-200 ${
                   isSelected
-                    ? "border-foreground bg-foreground text-white shadow-lg shadow-black/10"
+                    ? "border-accent bg-accent text-white shadow-lg shadow-accent/20"
                     : wasPreviouslyChosen
-                      ? "border-foreground bg-muted"
-                      : "border-border bg-white hover:border-foreground hover:shadow-md hover:shadow-black/5"
+                      ? "border-accent bg-accent/5"
+                      : "border-border/50 bg-white hover:border-accent hover:shadow-lg hover:shadow-accent/5 hover:-translate-y-0.5"
                 }`}
               >
                 {/* Icon */}
@@ -483,14 +487,14 @@ export default function QuizPage() {
                     isSelected
                       ? "text-white"
                       : wasPreviouslyChosen
-                        ? "text-foreground"
-                        : "text-foreground/20 group-hover:text-foreground"
+                        ? "text-accent"
+                        : "text-accent/30 group-hover:text-accent"
                   }`}
                 />
 
                 {/* Label */}
                 <span
-                  className={`text-sm font-bold uppercase tracking-wide transition-colors duration-200 ${
+                  className={`text-sm font-bold uppercase tracking-wide transition-colors duration-200 font-sans ${
                     isSelected
                       ? "text-white"
                       : "text-foreground"
@@ -501,7 +505,7 @@ export default function QuizPage() {
 
                 {/* Description */}
                 <span
-                  className={`text-xs leading-snug transition-colors duration-200 ${
+                  className={`text-xs leading-snug transition-colors duration-200 font-sans ${
                     isSelected ? "text-white/70" : "text-foreground/40"
                   }`}
                 >
