@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     walmart_private_key_path: str = ""
     walmart_private_key_pem: str = ""  # PEM key content as env var (alternative to file)
     enable_scheduler: bool = False
+    enable_retailer_scraper: bool = False
+    retailer_scrape_max_pages_per_term: int = 1
+    retailer_scrape_terms: str = ""
+    retailer_scrape_detail_enrich_per_retailer: int = 25
     max_pages_per_term: int = 5
     page_size: int = 50
 
