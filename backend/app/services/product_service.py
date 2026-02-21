@@ -59,6 +59,12 @@ def _retailer_name(price: ProductPrice) -> str:
     return "Unknown"
 
 
+def _retailer_logo(price: ProductPrice) -> str | None:
+    if price.retailer and price.retailer.logo_url:
+        return price.retailer.logo_url
+    return None
+
+
 def _product_to_list_item(product: Product) -> ProductListItem:
     return ProductListItem(
         id=product.id,
@@ -70,6 +76,7 @@ def _product_to_list_item(product: Product) -> ProductListItem:
         prices=[
             RetailerPriceSchema(
                 retailer=_retailer_name(p),
+                retailer_logo=_retailer_logo(p),
                 price=p.price,
                 url=_normalize_walmart_url(p.url) if p.source == "walmart" else p.url,
                 in_stock=p.in_stock,
@@ -93,6 +100,7 @@ def _product_to_detail(product: Product) -> ProductDetail:
         prices=[
             RetailerPriceSchema(
                 retailer=_retailer_name(p),
+                retailer_logo=_retailer_logo(p),
                 price=p.price,
                 url=_normalize_walmart_url(p.url) if p.source == "walmart" else p.url,
                 in_stock=p.in_stock,

@@ -1,20 +1,21 @@
 import { RetailerPrice } from "@/types";
 import { ExternalLink, Check, X } from "lucide-react";
+import { hasKnownPrice } from "@/lib/pricing";
 
 interface PriceComparisonTableProps {
   prices: RetailerPrice[];
 }
 
 export default function PriceComparisonTable({ prices }: PriceComparisonTableProps) {
-  const sorted = [...prices].sort((a, b) => a.price - b.price);
-  const lowestPrice = sorted[0]?.price;
+  const sorted = [...prices].sort((a, b) => {
+    const aKey = hasKnownPrice(a) ? a.price : Number.POSITIVE_INFINITY;
+    const bKey = hasKnownPrice(b) ? b.price : Number.POSITIVE_INFINITY;
+    return aKey - bKey;
+  });
+  const lowestKnownPrice = sorted.find(hasKnownPrice)?.price;
 
   return (
-<<<<<<< Updated upstream
-    <div className="overflow-hidden rounded-2xl border border-border">
-=======
     <div className="overflow-hidden rounded-2xl border border-border/50">
->>>>>>> Stashed changes
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border/50 bg-muted/30">
@@ -26,21 +27,6 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
         </thead>
         <tbody>
           {sorted.map((item) => (
-<<<<<<< Updated upstream
-            <tr key={item.retailer} className="border-b border-border last:border-0">
-              <td className="px-4 py-3 font-medium">{item.retailer}</td>
-              <td className="px-4 py-3">
-                <span
-                  className={
-                    item.price === lowestPrice ? "font-bold text-green-600" : ""
-                  }
-                >
-                  ${item.price.toFixed(2)}
-                </span>
-                {item.price === lowestPrice && (
-                  <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                    Best
-=======
             <tr key={item.retailer} className="border-b border-border/50 last:border-0 transition-colors hover:bg-muted/10">
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -64,7 +50,6 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
                     }`}
                   >
                     {hasKnownPrice(item) ? `$${item.price.toFixed(2)}` : "TBD"}
->>>>>>> Stashed changes
                   </span>
                   {hasKnownPrice(item) && item.price === lowestKnownPrice && (
                     <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-accent font-sans">
@@ -75,20 +60,6 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
               </td>
               <td className="px-6 py-4 text-center">
                 {item.inStock ? (
-<<<<<<< Updated upstream
-                  <Check className="mx-auto h-4 w-4 text-green-600" />
-                ) : (
-                  <X className="mx-auto h-4 w-4 text-red-400" />
-                )}
-              </td>
-              <td className="px-4 py-3 text-right">
-                <a
-                  href={item.url}
-                  className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
-                >
-                  Buy <ExternalLink className="h-3 w-3" />
-                </a>
-=======
                   <div className="flex items-center justify-center gap-1.5 text-green-600">
                      <Check className="h-4 w-4" />
                      <span className="text-[10px] font-bold uppercase tracking-widest font-sans">In Stock</span>
@@ -111,7 +82,6 @@ export default function PriceComparisonTable({ prices }: PriceComparisonTablePro
                 ) : (
                   <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/20 font-sans">Sold Out</span>
                 )}
->>>>>>> Stashed changes
               </td>
             </tr>
           ))}

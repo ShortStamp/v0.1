@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CategoryKey, ToolboxSlot, Product } from "@/types";
 import { categoryDefinitions, categoryGroups } from "@/lib/data";
+import { readBuildSlots, removeBuildSlot, readBuildProductCache } from "@/lib/buildSlots";
 import {
   ArrowLeft,
   Plus,
@@ -29,6 +30,8 @@ import {
   PenLine,
   type LucideIcon,
 } from "lucide-react";
+import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
+import { useCompatibility } from "@/lib/useCompatibility";
 
 const categoryIcons: Record<CategoryKey, LucideIcon> = {
   foundation: Droplets,
@@ -58,21 +61,14 @@ const initialSlots: ToolboxSlot[] = categoryDefinitions.map((c) => ({
 
 function loadSlots(): ToolboxSlot[] {
   if (typeof window === "undefined") return initialSlots;
-  try {
-    const raw = localStorage.getItem("buildSlots");
-    if (!raw) return initialSlots;
-    const saved: ToolboxSlot[] = JSON.parse(raw);
-    return initialSlots.map((slot) => {
-      const match = saved.find((s) => s.category === slot.category);
-      return match ? match : slot;
-    });
-  } catch {
-    return initialSlots;
-  }
-}
-
-function saveSlots(slots: ToolboxSlot[]) {
-  localStorage.setItem("buildSlots", JSON.stringify(slots));
+  const flatSlots = readBuildSlots();         // Record<categoryKey, productId>
+  const productCache = readBuildProductCache(); // Record<productId, Product>
+  return initialSlots.map((slot) => {
+    const productId = flatSlots[slot.category];
+    if (!productId) return { ...slot, product: null };
+    const product = productCache[productId] ?? null;
+    return { ...slot, product };
+  });
 }
 
 export default function GroupPage() {
@@ -83,17 +79,22 @@ export default function GroupPage() {
 
   const [slots, setSlots] = useState<ToolboxSlot[]>(() => loadSlots());
 
+  // Build filledSlots map (category → productId) for the compatibility hook
+  const filledSlotsForCompat = Object.fromEntries(
+    slots.filter((s) => s.product).map((s) => [s.category, s.product!.id])
+  );
+  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlotsForCompat);
+
   const handleRemove = (category: CategoryKey) => {
-    setSlots((prev) => {
-      const updated = prev.map((slot) =>
+    removeBuildSlot(category);
+    setSlots((prev) =>
+      prev.map((slot) =>
         slot.category === category ? { ...slot, product: null } : slot
-      );
-      saveSlots(updated);
-      return updated;
-    });
+      )
+    );
   };
 
-  const lowestPrice = (p: Product) => Math.min(...p.prices.map((r) => r.price));
+  const lowestPrice = (p: Product) => getBestOfferForProduct(p)?.price ?? 0;
 
   const categoryLabel = (key: CategoryKey) =>
     categoryDefinitions.find((c) => c.key === key)?.label ?? key;
@@ -140,36 +141,20 @@ export default function GroupPage() {
           return (
             <div
               key={catKey}
-<<<<<<< Updated upstream
-              className={`relative flex aspect-[3/5] flex-col items-center rounded-2xl border px-3 pb-4 pt-6 text-center transition-all ${
-                filled
-                  ? "border-accent bg-accent/5"
-                  : "border-border bg-white hover:border-accent hover:shadow-md hover:shadow-accent/10"
-=======
               className={`group relative flex aspect-[3/5] flex-col items-center justify-between overflow-hidden rounded-3xl border p-4 text-center transition-all duration-300 hover:-translate-y-1 ${
                 filled
                   ? "border-accent/30 bg-white shadow-xl shadow-accent/10"
                   : "border-border/50 bg-white hover:border-accent hover:shadow-xl hover:shadow-accent/5"
->>>>>>> Stashed changes
               }`}
             >
               {/* Icon / Product image */}
               {filled ? (
-<<<<<<< Updated upstream
-                <div className="mb-4 h-20 w-full overflow-hidden rounded-xl bg-muted">
-=======
                 <div className="relative mb-4 h-32 w-full overflow-hidden rounded-2xl bg-gradient-to-br from-muted/50 to-pink-soft/10 p-4">
->>>>>>> Stashed changes
                   <img
                     // eslint-disable-next-line @next/next/no-img-element
                     src={slot.product!.image || "/placeholder-product.jpg"}
-<<<<<<< Updated upstream
-                    alt={slot.product!.name}
-                    className="h-full w-full object-cover"
-=======
                     alt={getDisplayName(slot.product!.name)}
                     className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-110"
->>>>>>> Stashed changes
                     loading="lazy"
                     onError={(e) => {
                       e.currentTarget.src = "/placeholder-product.jpg";
@@ -186,13 +171,9 @@ export default function GroupPage() {
                   </div>
                 </div>
               ) : (
-<<<<<<< Updated upstream
-                <Icon className="mb-4 h-6 w-6 text-pink-200" />
-=======
                 <div className="mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-muted text-foreground/20 transition-colors group-hover:bg-accent/5 group-hover:text-accent">
                     <Icon className="h-8 w-8" />
                 </div>
->>>>>>> Stashed changes
               )}
 
               {/* Content */}
@@ -201,37 +182,6 @@ export default function GroupPage() {
                     {categoryLabel(catKey)}
                 </p>
 
-<<<<<<< Updated upstream
-              {filled ? (
-                <>
-                  <p className="text-xs text-foreground/40">{slot.product!.brand}</p>
-                  <p className="text-sm font-medium leading-snug">{slot.product!.name}</p>
-                  <p className="mt-auto pt-2 text-base font-bold text-accent">
-                    ${lowestPrice(slot.product!).toFixed(2)}
-                  </p>
-
-                  <button
-                    onClick={() => handleRemove(catKey)}
-                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-pink-100 text-pink-400 shadow-sm transition-colors hover:bg-accent hover:text-white"
-                    aria-label={`Remove ${slot.product!.name}`}
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-1 items-center justify-center">
-                    <span className="text-sm text-pink-200">&mdash;</span>
-                  </div>
-                  <Link
-                    href={`/build/category/${catKey}`}
-                    className="mt-auto inline-flex w-full items-center justify-center gap-1 rounded-full bg-accent px-3 py-3 text-[10px] font-medium uppercase tracking-[0.1em] text-white transition-all hover:shadow-md hover:shadow-accent/20 hover:brightness-110"
-                  >
-                    <Plus className="h-3 w-3" /> Choose
-                  </Link>
-                </>
-              )}
-=======
                 {filled ? (
                     <div className="w-full flex-1 flex flex-col items-center">
                         <p className="line-clamp-1 text-[10px] font-bold uppercase tracking-widest text-accent font-sans">{getDisplayBrand(slot.product!.brand)}</p>
@@ -293,7 +243,6 @@ export default function GroupPage() {
                     </div>
                 )}
               </div>
->>>>>>> Stashed changes
             </div>
           );
         })}

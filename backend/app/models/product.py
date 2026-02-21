@@ -65,6 +65,7 @@ class Retailer(Base):
     slug: Mapped[str] = mapped_column(String(200), unique=True)
     base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     affiliate_tag: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class ProductPrice(Base):

@@ -10,11 +10,6 @@ interface TrendCardProps {
 export default function TrendCard({ trend }: TrendCardProps) {
   return (
     <Link href={`/trends/${trend.id}`}>
-<<<<<<< Updated upstream
-      <div className="group overflow-hidden rounded-2xl border border-border bg-background transition-all hover:shadow-lg hover:shadow-accent/10 hover:-translate-y-0.5">
-        <div className="flex h-48 items-center justify-center bg-gradient-to-br from-pink-50 via-muted to-fuchsia-50">
-          <Flame className="h-12 w-12 text-pink-300" />
-=======
       <div className="group flex flex-col overflow-hidden rounded-2xl border border-border/50 bg-background transition-all duration-300 hover:shadow-2xl hover:shadow-accent/5 hover:-translate-y-1">
         <div className="relative flex h-56 items-center justify-center bg-gradient-to-br from-muted to-pink-soft/20 transition-colors group-hover:from-pink-soft/30 group-hover:to-muted">
           {trend.image ? (
@@ -28,7 +23,6 @@ export default function TrendCard({ trend }: TrendCardProps) {
             <Flame className="h-16 w-16 text-accent/20 transition-transform duration-500 group-hover:scale-110 group-hover:text-accent/40" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
->>>>>>> Stashed changes
         </div>
         <div className="flex flex-col gap-3 p-6">
           <div className="flex items-start justify-between gap-4">

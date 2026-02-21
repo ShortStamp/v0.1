@@ -45,11 +45,7 @@ export default function SaveProductButton({ productId, category }: SaveProductBu
         className={`group inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-6 py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all duration-300 font-sans ${
           saved
             ? "border-accent bg-accent/10 text-accent"
-<<<<<<< Updated upstream
-            : "border-border text-foreground hover:border-accent"
-=======
             : "border-border/50 bg-white text-foreground/60 hover:border-accent hover:text-accent"
->>>>>>> Stashed changes
         }`}
       >
         {saved ? (

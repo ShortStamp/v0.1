@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class RetailerPriceSchema(BaseModel):
     retailer: str
+    retailer_logo: str | None = None
     price: float
     url: str
     in_stock: bool = True

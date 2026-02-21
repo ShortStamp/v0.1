@@ -10,11 +10,8 @@
   --border: #FECDD6;
   --pink-deep: #BE185D;
   --pink-soft: #FBCFE8;
-<<<<<<< Updated upstream
-=======
   /* Override Tailwind v4 preflight — it reads --default-font-family, not --font-sans */
   --default-font-family: var(--font-libre-baskerville), "Libre Baskerville", Georgia, serif;
->>>>>>> Stashed changes
 }
 
 @theme inline {
@@ -27,12 +24,6 @@
   --color-border: var(--border);
   --color-pink-deep: var(--pink-deep);
   --color-pink-soft: var(--pink-soft);
-<<<<<<< Updated upstream
-  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-mono: var(--font-geist-mono);
-}
-
-=======
   --font-sans: var(--font-montserrat), "Montserrat", sans-serif;
   --font-serif: var(--font-libre-baskerville), "Libre Baskerville", Georgia, serif;
   --font-mono: var(--font-geist-mono);
@@ -44,11 +35,9 @@ body {
   scroll-behavior: smooth;
 }
 
->>>>>>> Stashed changes
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

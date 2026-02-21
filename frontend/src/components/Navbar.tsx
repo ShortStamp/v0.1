@@ -15,7 +15,7 @@ const baseLinks = [
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   const navLinks = [
     ...baseLinks,
@@ -34,11 +34,7 @@ export default function Navbar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <Link
           href="/"
-<<<<<<< Updated upstream
-          className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-base font-bold uppercase tracking-[0.2em] text-transparent"
-=======
           className="group flex items-center gap-2"
->>>>>>> Stashed changes
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white font-serif font-bold italic">
             S
@@ -54,17 +50,10 @@ export default function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-<<<<<<< Updated upstream
-              className={`text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-accent ${
-                pathname === link.href
-                  ? "text-accent underline underline-offset-4 decoration-accent-light"
-                  : "text-foreground/50"
-=======
               className={`text-[11px] font-bold uppercase tracking-[0.2em] transition-all hover:text-accent font-sans relative group ${
                 pathname === link.href
                   ? "text-accent"
                   : "text-foreground/60"
->>>>>>> Stashed changes
               }`}
             >
               {link.label}
@@ -76,11 +65,7 @@ export default function Navbar() {
           {isAuthenticated && (
             <button
               onClick={handleLogout}
-<<<<<<< Updated upstream
-              className="text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-accent"
-=======
               className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/40 transition-colors hover:text-accent font-sans"
->>>>>>> Stashed changes
             >
               LOG OUT
             </button>
@@ -89,11 +74,7 @@ export default function Navbar() {
 
         {/* Mobile toggle */}
         <button
-<<<<<<< Updated upstream
-          className="rounded-xl p-2 transition-colors hover:bg-muted md:hidden"
-=======
           className="rounded-full p-2 transition-colors hover:bg-muted md:hidden"
->>>>>>> Stashed changes
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
@@ -109,17 +90,10 @@ export default function Navbar() {
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-<<<<<<< Updated upstream
-              className={`block py-3 text-xs font-medium uppercase tracking-[0.15em] transition-colors hover:text-accent ${
-                pathname === link.href
-                  ? "text-accent underline underline-offset-4 decoration-accent-light"
-                  : "text-foreground/50"
-=======
               className={`text-sm font-bold uppercase tracking-[0.2em] transition-colors font-sans ${
                 pathname === link.href
                   ? "text-accent"
                   : "text-foreground/60"
->>>>>>> Stashed changes
               }`}
             >
               {link.label}
@@ -128,11 +102,7 @@ export default function Navbar() {
           {isAuthenticated && (
             <button
               onClick={handleLogout}
-<<<<<<< Updated upstream
-              className="block w-full py-3 text-left text-xs font-medium uppercase tracking-[0.15em] text-foreground/50 transition-colors hover:text-accent"
-=======
               className="text-sm font-bold uppercase tracking-[0.2em] text-foreground/40 transition-colors hover:text-accent font-sans text-left"
->>>>>>> Stashed changes
             >
               LOG OUT
             </button>

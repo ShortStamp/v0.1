@@ -390,8 +390,6 @@ class ApiClient {
     });
   }
 
-<<<<<<< Updated upstream
-=======
   // ---- Price History ----
 
   async getPriceHistory(productId: string): Promise<{ date: string; price: number; retailer: string }[]> {
@@ -424,7 +422,6 @@ class ApiClient {
     });
   }
 
->>>>>>> Stashed changes
   // ---- Builds ----
 
   async getActiveBuild(): Promise<RawBuild> {
@@ -453,9 +450,6 @@ class ApiClient {
 }
 
 /** Map snake_case API response to camelCase Product type */
-<<<<<<< Updated upstream
-function mapProduct(data: any): Product {
-=======
 function mapProduct(data: RawProduct): Product {
   const normalizedPrices = Array.isArray(data.prices)
     ? data.prices.map((p: RawRetailerPrice) => ({
@@ -467,15 +461,14 @@ function mapProduct(data: RawProduct): Product {
       }))
     : [];
 
->>>>>>> Stashed changes
   return {
     id: data.id,
-    name: data.name,
-    brand: data.brand,
-    image: data.image,
+    name: (data.name || "Product").toString().trim(),
+    brand: (data.brand || "Unknown").toString().trim(),
+    image: data.image || "/placeholder-product.jpg",
     category: data.category,
     stampScore: data.stamp_score,
-    prices: data.prices || [],
+    prices: normalizedPrices,
     description: data.description,
     specs: data.specs,
     reviews: data.reviews,
