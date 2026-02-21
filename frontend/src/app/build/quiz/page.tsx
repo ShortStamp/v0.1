@@ -68,15 +68,15 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (config: any) => void;
-          prompt: (callback?: (notification: any) => void) => void;
+          initialize: (config: google.accounts.id.client.Config) => void;
+          prompt: (callback?: (notification: google.accounts.id.CredentialResponse) => void) => void;
         };
       };
     };
     AppleID?: {
       auth: {
-        init: (config: any) => void;
-        signIn: () => Promise<any>;
+        init: (config: AppleID.auth.ClientConfig) => void;
+        signIn: () => Promise<AppleID.Authorization>;
       };
     };
   }
@@ -167,7 +167,7 @@ export default function QuizPage() {
     return () => {
       document.body.removeChild(script);
     };
-  }, [done]);
+  }, [done, handleGoogleResponse]);
 
   // Load Apple Sign In SDK
   useEffect(() => {
@@ -193,14 +193,27 @@ export default function QuizPage() {
     };
   }, [done]);
 
+<<<<<<< Updated upstream
   async function handleGoogleResponse(response: any) {
+=======
+  async function syncProfileToAPI() {
+    try {
+      const raw = localStorage.getItem("beautyProfile");
+      if (!raw) return;
+      const profile = JSON.parse(raw) as BeautyProfile;
+      await api.saveProfile(profile);
+    } catch {}
+  }
+
+  async function handleGoogleResponse(response: google.accounts.id.CredentialResponse) {
+>>>>>>> Stashed changes
     setAuthLoading(true);
     setAuthError("");
     try {
       await loginWithGoogle(response.credential);
       router.push("/build");
-    } catch (err: any) {
-      setAuthError(err.message || "Google sign-in failed");
+    } catch (err: unknown) {
+      setAuthError((err as Error).message || "Google sign-in failed");
     } finally {
       setAuthLoading(false);
     }
@@ -226,9 +239,9 @@ export default function QuizPage() {
         );
         router.push("/build");
       }
-    } catch (err: any) {
-      if (err.error !== "popup_closed_by_user") {
-        setAuthError(err.message || "Apple sign-in failed");
+    } catch (err: unknown) {
+      if ((err as any).error !== "popup_closed_by_user") {
+        setAuthError((err as Error).message || "Apple sign-in failed");
       }
     } finally {
       setAuthLoading(false);
@@ -246,8 +259,8 @@ export default function QuizPage() {
         await login(email, password);
       }
       router.push("/build");
-    } catch (err: any) {
-      setAuthError(err.message || "Authentication failed");
+    } catch (err: unknown) {
+      setAuthError((err as Error).message || "Authentication failed");
     } finally {
       setAuthLoading(false);
     }

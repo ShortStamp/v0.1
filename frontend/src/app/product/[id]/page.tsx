@@ -58,26 +58,45 @@ export default function ProductPage() {
   const walmartUrl = product.walmartUrl || walmartRetailer?.url;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-6 py-12">
       <Link
         href="/build"
+<<<<<<< Updated upstream
         className="mb-6 inline-flex items-center gap-1 text-sm text-foreground/60 hover:text-accent"
+=======
+        className="mb-10 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/40 transition-colors hover:text-accent font-sans"
+>>>>>>> Stashed changes
       >
         <ArrowLeft className="h-4 w-4" /> Back to Build
       </Link>
 
+<<<<<<< Updated upstream
       <div className="mb-8 grid gap-8 md:grid-cols-2">
         <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pink-50 via-muted to-rose-50 p-6">
+=======
+      <div className="mb-16 grid gap-12 lg:grid-cols-2">
+        <div className="relative aspect-square items-center justify-center overflow-hidden rounded-3xl bg-white p-12 shadow-2xl shadow-accent/5 border border-border/50">
+           <div className="absolute top-6 left-6 z-10">
+              <ShortStampBadge score={product.stampScore} />
+           </div>
+>>>>>>> Stashed changes
           <img
+            // eslint-disable-next-line @next/next/no-img-element
             src={product.image || "/placeholder-product.jpg"}
+<<<<<<< Updated upstream
             alt={product.name}
             className="h-full w-full object-contain"
+=======
+            alt={getDisplayName(product.name)}
+            className="h-full w-full object-contain transition-transform duration-700 hover:scale-105"
+>>>>>>> Stashed changes
             onError={(e) => {
               e.currentTarget.src = "/placeholder-product.jpg";
             }}
           />
         </div>
 
+<<<<<<< Updated upstream
         <div className="flex flex-col gap-3">
           <p className="text-sm text-foreground/50">{product.brand}</p>
           <h1 className="text-2xl font-bold">{product.name}</h1>
@@ -95,14 +114,43 @@ export default function ProductPage() {
                 </li>
               ))}
             </ul>
+=======
+        <div className="flex flex-col justify-center gap-6">
+          <div className="space-y-1">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-accent font-sans">{getDisplayBrand(product.brand)}</p>
+            <h1 className="text-4xl font-bold font-serif leading-tight">{getDisplayName(product.name)}</h1>
+          </div>
+          
+          <div className="flex items-baseline gap-3">
+            <p className="text-3xl font-bold text-foreground font-sans tracking-tight">{formatPrice(bestRetailer?.price)}</p>
+            <span className="text-sm font-medium text-foreground/40 font-sans italic">Best Current Price</span>
+          </div>
+
+          <div className="h-px w-full bg-border/50" />
+
+          {product.description && (
+            <p className="text-base leading-relaxed text-foreground/60 font-sans font-light">{product.description}</p>
+>>>>>>> Stashed changes
           )}
 
-          <div className="mt-4 flex flex-col gap-3">
+          {product.specs && (
+            <div className="grid grid-cols-2 gap-4">
+              {product.specs.map((spec) => (
+                <div key={spec} className="flex items-center gap-3 rounded-xl bg-muted/30 px-4 py-3 border border-border/30">
+                  <div className="h-1.5 w-1.5 rounded-full bg-accent" />
+                  <span className="text-xs font-semibold font-sans text-foreground/70">{spec}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-col gap-4">
             {bestRetailer && (
               <a
                 href={bestRetailer.url}
                 target="_blank"
                 rel="noopener noreferrer"
+<<<<<<< Updated upstream
                 className="inline-flex w-full items-center justify-center gap-2 bg-accent px-6 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
               >
                 Buy Now - ${lowestPrice?.toFixed(2) ?? "0.00"} at {bestRetailer.retailer}
@@ -119,21 +167,57 @@ export default function ProductPage() {
               </a>
             )}
             <SaveProductButton productId={product.id} category={product.category} />
+=======
+                className="group inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-accent px-8 py-5 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-xl shadow-accent/20 transition-all duration-300 hover:bg-pink-deep hover:shadow-pink-deep/30 hover:-translate-y-1 font-sans"
+              >
+                Purchase via {bestRetailer.retailer} 
+                <span className="opacity-50 transition-transform group-hover:translate-x-1">&rarr;</span>
+              </a>
+            )}
+            <div className="flex gap-4">
+              <SaveProductButton productId={product.id} category={product.category} />
+              {walmartUrl && (
+                <a
+                  href={walmartUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border/50 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-foreground transition-all duration-300 hover:bg-muted hover:border-accent font-sans"
+                >
+                  View Walmart
+                </a>
+              )}
+            </div>
+>>>>>>> Stashed changes
           </div>
         </div>
       </div>
 
-      <section className="mb-10">
-        <h2 className="mb-4 text-xl font-semibold">Compare Prices</h2>
-        <PriceComparisonTable prices={product.prices} />
-      </section>
+      <div className="grid gap-12 lg:grid-cols-2">
+        <section className="rounded-3xl border border-border/50 bg-white p-10 shadow-xl shadow-accent/5">
+          <div className="mb-8 flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Retailer Comparison</h2>
+            <span className="text-xs font-medium text-foreground/40 font-sans">{product.prices.length} Retailers</span>
+          </div>
+          <PriceComparisonTable prices={product.prices} />
+        </section>
 
+<<<<<<< Updated upstream
       <section>
         <h2 className="mb-4 text-xl font-semibold">Price History</h2>
         <div className="rounded-2xl border border-border bg-muted p-8 text-center text-sm text-foreground/40">
           Price history chart coming soon - track price changes over time.
         </div>
       </section>
+=======
+        <section className="rounded-3xl border border-border/50 bg-white p-10 shadow-xl shadow-accent/5">
+          <div className="mb-8 flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Price History</h2>
+            <span className="text-xs font-medium text-foreground/40 font-sans">Last 30 Days</span>
+          </div>
+          <PriceHistoryChart productId={product.id} />
+        </section>
+      </div>
+>>>>>>> Stashed changes
     </div>
   );
 }

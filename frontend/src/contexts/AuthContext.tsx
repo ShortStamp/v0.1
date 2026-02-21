@@ -60,21 +60,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (api.isAuthenticated) {
-      api
-        .getMe()
-        .then((u) => {
+    const checkAuth = async () => {
+      if (api.isAuthenticated) {
+        try {
+          const u = await api.getMe();
           setUser(u);
-          return loadProfileFromBackend();
-        })
-        .catch(() => {
+          await loadProfileFromBackend();
+        } catch {
           api.clearTokens();
           setUser(null);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
+        }
+      }
+      setIsLoading(false); // Always set to false after initial check, regardless of auth status
+    };
+    checkAuth();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

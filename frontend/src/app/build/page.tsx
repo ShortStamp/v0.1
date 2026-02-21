@@ -23,17 +23,26 @@ const mainCategories: CategoryKey[] = [
 
 export default function BuildPage() {
   const router = useRouter();
+<<<<<<< Updated upstream
   const [profile, setProfile] = useState<BeautyProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [slots, setSlots] = useState<ToolboxSlot[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(null);
+=======
+  const [filledSlots] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    return readBuildSlots();
+  });
+  const [isLoadingQuizRedirect, setIsLoadingQuizRedirect] = useState(false); // New state for quiz redirect loading
+>>>>>>> Stashed changes
 
   useEffect(() => {
     const saved = localStorage.getItem("beautyProfile");
     if (!saved) {
+      setIsLoadingQuizRedirect(true); // Indicate loading while redirecting
       router.push("/build/quiz");
-      return;
     }
+<<<<<<< Updated upstream
     setProfile(JSON.parse(saved));
 
     // Restore saved slots from localStorage
@@ -74,6 +83,9 @@ export default function BuildPage() {
       setSlots(initialSlots);
       setLoading(false);
     }
+=======
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+>>>>>>> Stashed changes
   }, [router]);
 
   const handleSelectProduct = (category: CategoryKey) => {
@@ -106,7 +118,7 @@ export default function BuildPage() {
     return sorted[0];
   };
 
-  if (loading) {
+  if (isLoadingQuizRedirect) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-sm text-neutral-500">Loading...</div>
@@ -115,6 +127,7 @@ export default function BuildPage() {
   }
 
   return (
+<<<<<<< Updated upstream
     <div className="min-h-screen bg-white">
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-8">
@@ -199,6 +212,180 @@ export default function BuildPage() {
                   </button>
                 )}
               </div>
+=======
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-5xl px-6 py-16">
+        {/* Header */}
+        <div className="mb-12">
+          <div className="mb-4 inline-block rounded-full bg-accent/10 px-4 py-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent font-sans">
+              Personalized Toolbox
+            </p>
+          </div>
+          <h1 className="mb-4 text-4xl font-bold font-serif">
+            Build Your Look
+          </h1>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-md text-sm leading-relaxed text-foreground/60 font-sans">
+              Curate your essentials across 5 key face areas. Our AI chemist will analyze compatibility in real-time.
+            </p>
+            <Link
+              href="/build/quiz"
+              className="text-[11px] font-bold uppercase tracking-[0.15em] text-accent transition-all hover:text-pink-deep font-sans"
+            >
+              Edit Beauty Profile &rarr;
+            </Link>
+          </div>
+        </div>
+
+        {/* Overall progress */}
+        <div className="mb-16 rounded-3xl bg-white p-8 shadow-xl shadow-accent/5 border border-border/50">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">
+                Curating Progress
+              </span>
+              <p className="text-2xl font-bold font-sans">
+                {Math.round(totalCategories > 0 ? (totalFilled / totalCategories) * 100 : 0)}% <span className="text-sm font-medium text-foreground/40 font-sans">Complete</span>
+              </p>
+            </div>
+            <div className="text-right">
+               <span className="text-sm font-bold font-sans text-accent">
+                {totalFilled} <span className="text-foreground/20">/</span> {totalCategories}
+              </span>
+            </div>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full bg-accent transition-all duration-700 ease-out"
+              style={{ width: `${totalCategories > 0 ? (totalFilled / totalCategories) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Face area group tiles */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {categoryGroups.map((group) => {
+            const Icon = groupIcons[group.key] ?? Circle;
+            const filled = group.categories.filter(
+              (cat) => filledSlots[cat]
+            ).length;
+            const total = group.categories.length;
+            const isComplete = filled === total && total > 0;
+
+            // Tally conflicts in this group from the compatibility map
+            const groupConflicts = group.categories
+              .map((cat) => filledSlots[cat])
+              .filter((pid) => pid && compatibilityMap[pid] && !compatibilityMap[pid].isCompatible);
+            const errorCount = groupConflicts.filter(
+              (pid) => compatibilityMap[pid]?.severity === "error"
+            ).length;
+            const conflictCount = groupConflicts.length;
+            const worstSeverity = errorCount > 0 ? "error" : conflictCount > 0 ? "warning" : null;
+
+            return (
+              <Link
+                key={group.key}
+                href={`/build/${group.key}`}
+                className={`group flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-accent/10 ${
+                  isComplete
+                    ? "border-accent bg-accent text-white shadow-xl shadow-accent/20"
+                    : "border-border/50 bg-white hover:border-accent"
+                }`}
+              >
+                <div className="mb-8 flex items-center justify-between">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
+                    isComplete ? "bg-white/20 text-white" : "bg-muted text-accent group-hover:bg-accent group-hover:text-white"
+                  }`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <ChevronRight
+                    className={`h-5 w-5 transition-transform duration-300 group-hover:translate-x-1 ${
+                      isComplete ? "text-white/50" : "text-foreground/20"
+                    }`}
+                  />
+                </div>
+
+                <h2
+                  className={`mb-1 text-xl font-bold tracking-tight font-serif ${
+                    isComplete ? "text-white" : "text-foreground"
+                  }`}
+                >
+                  {group.label}
+                </h2>
+
+                <p
+                  className={`mb-6 text-xs font-sans font-medium uppercase tracking-widest ${
+                    isComplete ? "text-white/60" : "text-foreground/40"
+                  }`}
+                >
+                  {group.categories.length} {group.categories.length === 1 ? "category" : "categories"}
+                </p>
+
+                {/* Compatibility Badges */}
+                <div className="mb-6 flex flex-wrap gap-2">
+                  {quotaExceeded && filled > 0 && (
+                    <div className={`rounded-full px-3 py-1 text-[8px] font-bold uppercase tracking-[0.15em] font-sans ${
+                      isComplete ? "bg-white/20 text-white" : "bg-foreground text-white"
+                    }`}>
+                      ! API Quota
+                    </div>
+                  )}
+
+                  {!quotaExceeded && worstSeverity && (
+                    <div className={`rounded-full px-3 py-1 text-[8px] font-bold uppercase tracking-[0.15em] font-sans ${
+                      isComplete ? "bg-white/20 text-white" : worstSeverity === "error" ? "bg-red-500 text-white" : "bg-amber-400 text-foreground"
+                    }`}>
+                      {worstSeverity === "error" ? "✕" : "!"} {conflictCount} Conflict{conflictCount > 1 ? "s" : ""}
+                    </div>
+                  )}
+
+                  {!quotaExceeded && !isAnalyzing && !worstSeverity && filled > 0 &&
+                    group.categories
+                      .filter((cat) => filledSlots[cat])
+                      .every((cat) => analyzedIds.has(filledSlots[cat])) && (
+                    <div className={`rounded-full px-3 py-1 text-[8px] font-bold uppercase tracking-[0.15em] font-sans ${
+                      isComplete ? "bg-white/20 text-white" : "bg-green-50 text-green-600 border border-green-100"
+                    }`}>
+                      ✓ Compatible
+                    </div>
+                  )}
+
+                  {isAnalyzing && filled > 0 && !worstSeverity && (
+                     <div className={`rounded-full px-3 py-1 text-[8px] font-bold uppercase tracking-[0.15em] font-sans animate-pulse ${
+                      isComplete ? "bg-white/10 text-white/50" : "bg-muted text-foreground/30"
+                    }`}>
+                      ⚗ Analyzing…
+                    </div>
+                  )}
+                </div>
+
+                {/* Fill count bar */}
+                <div className="mt-auto">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-[0.2em] font-sans ${
+                        isComplete ? "text-white/60" : "text-foreground/30"
+                      }`}
+                    >
+                      {filled} <span className="opacity-50">/</span> {total} selected
+                    </span>
+                  </div>
+                  <div
+                    className={`h-1.5 w-full rounded-full ${
+                      isComplete ? "bg-white/20" : "bg-muted"
+                    }`}
+                  >
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        isComplete ? "bg-white" : "bg-accent"
+                      }`}
+                      style={{ width: `${total > 0 ? (filled / total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </Link>
+>>>>>>> Stashed changes
             );
           })}
         </div>

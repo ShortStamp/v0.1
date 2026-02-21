@@ -5,12 +5,94 @@ import type {
   Product,
   RetailerPrice,
   Trend,
+  CategoryKey,
 } from "@/types";
 
 const API_URL = "/api/v1";
 
+interface RawCategory {
+  key: CategoryKey;
+  label: string;
+  group_key: string;
+  filters: Array<{ key: string; label: string; type: string; options?: string[] }>;
+}
+
+interface RawCategoryGroup {
+  key: string;
+  label: string;
+  categories: RawCategory[];
+}
+
+interface RawProduct {
+  id: string;
+  name: string;
+  brand: string;
+  image?: string;
+  category: CategoryKey;
+  stamp_score: number;
+  prices: RawRetailerPrice[];
+  description?: string;
+  specs?: string[];
+  reviews?: Array<{ author: string; rating: number; text: string }>;
+  walmart_url?: string;
+  filters?: Record<string, string>;
+}
+
+interface RawRetailerPrice {
+  retailer: string;
+  retailer_logo?: string;
+  price: number;
+  url: string;
+  in_stock: boolean;
+}
+
+interface RawTrend {
+  id: string;
+  name: string;
+  image?: string;
+  stamp_score: number;
+  description?: string;
+  direction?: "rising" | "stable" | "declining";
+  products?: RawProduct[];
+  videos?: Array<{ title?: string; url: string }>;
+  articles?: Array<{ title: string; url: string }>;
+}
+
+interface RawQuizQuestion {
+  key: string;
+  title: string;
+  subtitle: string;
+  options: Array<{ value: string; label: string; description: string; icon: string }>;
+}
+
+interface RawBeautyProfile {
+  skin_tone?: string;
+  undertone?: string;
+  skin_type?: string;
+  coverage?: string;
+  finish?: string;
+  budget?: string;
+}
+
+interface RawUserStyles {
+  styles: string[];
+}
+
+interface RawUserNotifications {
+  enabled: boolean;
+}
+
+interface RawBuild {
+  id: string;
+  name: string;
+  user_id: string;
+  slots: Array<{ category_key: CategoryKey; product_id: string }>;
+  created_at: string;
+  updated_at: string;
+}
+
 interface PaginatedProducts {
-  items: Product[];
+  items: RawProduct[];
   total: number;
   page: number;
   per_page: number;
@@ -163,13 +245,11 @@ class ApiClient {
   // ---- Categories ----
 
   async getCategoryGroups(): Promise<CategoryGroup[]> {
-    const groups = await this.fetch<
-      { key: string; label: string; categories: { key: string; label: string; group_key: string; filters: any[] }[] }[]
-    >("/categories/groups");
+    const groups = await this.fetch<RawCategoryGroup[]>("/categories/groups");
     return groups.map((g) => ({
       key: g.key,
       label: g.label,
-      categories: g.categories.map((c) => c.key) as any,
+      categories: g.categories.map((c) => c.key),
     }));
   }
 
@@ -199,7 +279,13 @@ class ApiClient {
       }
     }
 
-    const data = await this.fetch<any>(`/products?${searchParams}`);
+    const data = await this.fetch<{
+        items: RawProduct[];
+        total: number;
+        page: number;
+        per_page: number;
+        pages: number;
+    }>(`/products?${searchParams}`);
     return {
       ...data,
       items: data.items.map(mapProduct),
@@ -207,7 +293,7 @@ class ApiClient {
   }
 
   async getProduct(id: string): Promise<Product> {
-    const data = await this.fetch<any>(`/products/${id}`);
+    const data = await this.fetch<RawProduct>(`/products/${id}`);
     return mapProduct(data);
   }
 
@@ -241,7 +327,7 @@ class ApiClient {
   // ---- Trends ----
 
   async getTrends(): Promise<Trend[]> {
-    const data = await this.fetch<any[]>("/trends");
+    const data = await this.fetch<RawTrend[]>("/trends");
     return data.map((t) => ({
       id: t.id,
       name: t.name,
@@ -249,12 +335,14 @@ class ApiClient {
       stampScore: t.stamp_score,
       description: t.description,
       direction: t.direction,
-      products: [],
+      products: [], // Products are fetched separately for a trend
+      videos: t.videos || [],
+      articles: t.articles || [],
     }));
   }
 
   async getTrend(id: string): Promise<Trend> {
-    const data = await this.fetch<any>(`/trends/${id}`);
+    const data = await this.fetch<RawTrend>(`/trends/${id}`);
     return {
       id: data.id,
       name: data.name,
@@ -270,14 +358,14 @@ class ApiClient {
 
   // ---- Quiz ----
 
-  async getQuizQuestions(): Promise<any[]> {
+  async getQuizQuestions(): Promise<RawQuizQuestion[]> {
     return this.fetch("/quiz/questions");
   }
 
   // ---- User Profile ----
 
   async getProfile(): Promise<BeautyProfile> {
-    const data = await this.fetch<any>("/users/me/profile");
+    const data = await this.fetch<RawBeautyProfile>("/users/me/profile");
     return {
       skinTone: data.skin_tone || "",
       undertone: data.undertone || "",
@@ -302,20 +390,55 @@ class ApiClient {
     });
   }
 
+<<<<<<< Updated upstream
+=======
+  // ---- Price History ----
+
+  async getPriceHistory(productId: string): Promise<{ date: string; price: number; retailer: string }[]> {
+    return this.fetch(`/products/${productId}/price-history`);
+  }
+
+  // ---- Styles & Notifications ----
+
+  async getStyles(): Promise<string[]> {
+    const data = await this.fetch<RawUserStyles>("/users/me/styles");
+    return data.styles || [];
+  }
+
+  async saveStyles(styles: string[]): Promise<void> {
+    await this.fetch("/users/me/styles", {
+      method: "PUT",
+      body: JSON.stringify({ styles }),
+    });
+  }
+
+  async getNotifications(): Promise<boolean> {
+    const data = await this.fetch<RawUserNotifications>("/users/me/notifications");
+    return data.enabled ?? false;
+  }
+
+  async saveNotifications(enabled: boolean): Promise<void> {
+    await this.fetch("/users/me/notifications", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+>>>>>>> Stashed changes
   // ---- Builds ----
 
-  async getActiveBuild(): Promise<any> {
+  async getActiveBuild(): Promise<RawBuild> {
     return this.fetch("/builds/active");
   }
 
-  async createBuild(name?: string): Promise<any> {
+  async createBuild(name?: string): Promise<RawBuild> {
     return this.fetch("/builds", {
       method: "POST",
       body: JSON.stringify({ name: name || "My Build" }),
     });
   }
 
-  async setSlot(buildId: string, categoryKey: string, productId: string): Promise<any> {
+  async setSlot(buildId: string, categoryKey: CategoryKey, productId: string): Promise<RawBuild> {
     return this.fetch(`/builds/${buildId}/slots/${categoryKey}`, {
       method: "PUT",
       body: JSON.stringify({ product_id: productId }),
@@ -330,7 +453,21 @@ class ApiClient {
 }
 
 /** Map snake_case API response to camelCase Product type */
+<<<<<<< Updated upstream
 function mapProduct(data: any): Product {
+=======
+function mapProduct(data: RawProduct): Product {
+  const normalizedPrices = Array.isArray(data.prices)
+    ? data.prices.map((p: RawRetailerPrice) => ({
+        retailer: p?.retailer || "Retailer",
+        retailerLogo: p?.retailer_logo ?? undefined,
+        price: Number.isFinite(Number(p?.price)) ? Number(p.price) : 0,
+        url: p?.url || "#",
+        inStock: Boolean(p?.in_stock ?? true), // Assuming in_stock or true by default
+      }))
+    : [];
+
+>>>>>>> Stashed changes
   return {
     id: data.id,
     name: data.name,

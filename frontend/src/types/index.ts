@@ -54,6 +54,7 @@ export interface Product {
 
 export interface RetailerPrice {
   retailer: string;
+  retailerLogo?: string;
   price: number;
   url: string;
   inStock: boolean;

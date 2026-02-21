@@ -40,46 +40,62 @@ export default function Toolbox({ slots }: ToolboxProps) {
 
   return (
     <div
+<<<<<<< Updated upstream
       className={`mt-8 rounded-2xl p-5 transition-colors ${
         isComplete
           ? "bg-gradient-to-r from-accent to-secondary text-white shadow-lg shadow-accent/20"
           : "border border-border bg-muted"
+=======
+      className={`mt-10 rounded-3xl p-8 transition-all duration-500 ${
+        isComplete
+          ? "bg-foreground text-background shadow-2xl shadow-black/20 scale-[1.02]"
+          : "border border-border/50 bg-white shadow-xl shadow-accent/5"
+>>>>>>> Stashed changes
       }`}
     >
-      <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+      <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
         <div
-          className={`flex items-center gap-2 text-xs uppercase tracking-[0.1em] ${
-            isComplete ? "text-white/80" : "text-foreground/40"
+          className={`flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] font-sans ${
+            isComplete ? "text-accent-light" : "text-foreground/30"
           }`}
         >
           {isComplete ? (
-            <>
+            <div className="flex items-center gap-2 rounded-full bg-accent/20 px-4 py-2 text-accent-light">
               <Check className="h-4 w-4" />
-              <span>Set match: Looks great!</span>
-            </>
+              <span>Perfect Set Match!</span>
+            </div>
           ) : (
-            <span>
-              {filledSlots.length}/{slots.length} categories filled — pick at least 3 to see set
-              match.
-            </span>
+            <div className="flex items-center gap-2 rounded-full bg-muted px-4 py-2">
+              <span className="text-accent">{filledSlots.length}/{slots.length}</span>
+              <span>Slots Filled</span>
+            </div>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          <p className="text-lg font-bold">
-            Total: ${total.toFixed(2)}
-          </p>
+        <div className="flex items-center gap-8">
+          <div className="text-center sm:text-right">
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${isComplete ? "text-white/40" : "text-foreground/30"}`}>Total Estimate</p>
+            <p className="text-3xl font-bold font-sans tracking-tight">
+              ${total.toFixed(2)}
+            </p>
+          </div>
           {filledSlots.length > 0 && (
             <button
               onClick={handleBuyAll}
               disabled={buyingAll}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all ${
+              className={`group inline-flex items-center gap-2 rounded-full px-8 py-4 text-[11px] font-bold uppercase tracking-widest transition-all duration-300 font-sans ${
                 isComplete
+<<<<<<< Updated upstream
                   ? "bg-white text-accent hover:bg-white/90 disabled:opacity-50"
                   : "bg-accent text-white hover:brightness-110 disabled:opacity-50"
               }`}
+=======
+                  ? "bg-accent text-white hover:bg-pink-deep shadow-lg shadow-accent/20"
+                  : "bg-foreground text-background hover:opacity-90 shadow-lg shadow-black/10"
+              } disabled:opacity-50`}
+>>>>>>> Stashed changes
             >
-              <ShoppingCart className="h-4 w-4" />
-              {buyingAll ? "Opening..." : `Buy Set (${filledSlots.length})`}
+              <ShoppingCart className={`h-4 w-4 transition-transform group-hover:-translate-y-0.5 ${buyingAll ? "animate-bounce" : ""}`} />
+              {buyingAll ? "Opening Tabs..." : `Checkout Look (${filledSlots.length})`}
             </button>
           )}
         </div>
@@ -87,21 +103,33 @@ export default function Toolbox({ slots }: ToolboxProps) {
 
       {/* Buy all breakdown */}
       {filledSlots.length > 0 && (
-        <div className={`mt-4 border-t pt-4 ${isComplete ? "border-white/20" : "border-border"}`}>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={`mt-8 border-t pt-8 ${isComplete ? "border-white/10" : "border-border/30"}`}>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filledSlots.map((slot) => {
               const best = getLowestRetailer(slot);
               return (
                 <div
                   key={slot.category}
-                  className={`flex items-center justify-between text-xs ${
-                    isComplete ? "text-white/70" : "text-foreground/50"
+                  className={`flex flex-col gap-1 rounded-2xl p-4 transition-colors ${
+                    isComplete ? "bg-white/5 hover:bg-white/10" : "bg-muted/30 hover:bg-muted/50"
                   }`}
                 >
+<<<<<<< Updated upstream
                   <span>{slot.product!.name}</span>
                   <span className="font-medium">
                     ${best?.price.toFixed(2)} @ {best?.retailer}
                   </span>
+=======
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isComplete ? "text-white/40" : "text-foreground/30"}`}>{slot.category}</p>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-semibold truncate max-w-[120px] font-serif ${isComplete ? "text-white" : "text-foreground"}`}>{slot.product!.name}</span>
+                    <span className={`text-[10px] font-bold font-sans ${isComplete ? "text-accent-light" : "text-accent"}`}>
+                      {best && hasKnownPrice(best)
+                        ? `$${best.price.toFixed(2)}`
+                        : "Check Price"}
+                    </span>
+                  </div>
+>>>>>>> Stashed changes
                 </div>
               );
             })}
