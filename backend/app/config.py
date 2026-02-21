@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     apple_key_id: str = ""
     apple_private_key: str = ""
 
+    # Gemini LLM (used by compatibility agents)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash-lite"
+
     # Legacy keys (kept for backward compat)
     amazon_access_key: str = ""
     amazon_secret_key: str = ""

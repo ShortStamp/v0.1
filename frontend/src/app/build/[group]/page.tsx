@@ -122,7 +122,7 @@ export default function GroupPage() {
       <div className="mb-10 flex items-center gap-4">
         <button
           onClick={() => router.push("/build")}
-          className="rounded-xl p-2 transition-colors hover:bg-muted hover:text-accent"
+          className="p-2 transition-colors hover:bg-muted"
           aria-label="Back to build"
         >
           <ArrowLeft className="h-5 w-5" />

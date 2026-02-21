@@ -5,6 +5,7 @@ from app.database import get_db
 from app.schemas.product import (
     FilterPropertiesResponse,
     PaginatedProducts,
+    PriceHistoryEntry,
     ProductDetail,
     RetailerPriceSchema,
 )
@@ -84,3 +85,8 @@ async def get_product(product_id: str, db: AsyncSession = Depends(get_db)):
 @router.get("/{product_id}/prices", response_model=list[RetailerPriceSchema])
 async def get_product_prices(product_id: str, db: AsyncSession = Depends(get_db)):
     return await product_service.get_product_prices(db, product_id)
+
+
+@router.get("/{product_id}/price-history", response_model=list[PriceHistoryEntry])
+async def get_price_history(product_id: str, db: AsyncSession = Depends(get_db)):
+    return await product_service.get_price_history(db, product_id)

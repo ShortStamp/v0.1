@@ -473,7 +473,7 @@ export default function QuizPage() {
                 key={opt.value}
                 onClick={() => advance(opt.value)}
                 disabled={selected !== null}
-                className={`group relative flex flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center transition-all duration-200 ${
+                className={`group relative flex flex-col items-center justify-center gap-3 border px-4 py-5 text-center transition-all duration-200 ${
                   isSelected
                     ? "border-accent bg-accent text-white shadow-lg shadow-accent/20"
                     : wasPreviouslyChosen
