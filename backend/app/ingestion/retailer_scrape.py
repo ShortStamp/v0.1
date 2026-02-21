@@ -718,12 +718,8 @@ async def _upsert_product_and_price(
         if candidate_brand_norm and candidate_brand_norm not in generic_brand_values:
             product.brand_id = brand_id
         if candidate.image_url:
-            current_is_poor = (
-                product.image_url == "/placeholder-product.jpg"
-                or bool(re.search(r"\._[A-Z]{2}\d{2,4}_\.", product.image_url or ""))
-            )
-            if current_is_poor:
-                product.image_url = candidate.image_url
+            # Always prioritize retailer image over any existing image
+            product.image_url = candidate.image_url
         if not product.source_id:
             product.source = source_name
             product.source_id = candidate.external_id

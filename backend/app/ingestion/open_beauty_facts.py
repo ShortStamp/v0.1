@@ -114,6 +114,7 @@ async def _upsert_product(
     description: str | None,
     source_id: str | None,
     filters: dict[str, str] | None = None,
+    inci_ingredients: list[str] | None = None,
 ) -> str:
     """Upsert a product by barcode (preferred) or (brand_id + normalized name).
     
@@ -147,6 +148,12 @@ async def _upsert_product(
         # Fill in barcode if we didn't have it before
         if barcode and not existing.upc:
             existing.upc = barcode
+        
+        # Update ingredients if we found them and didn't have them
+        if inci_ingredients and not existing.inci_ingredients:
+            existing.inci_ingredients = inci_ingredients
+
+        # Only set image if it's currently the placeholder AND we actually have a non-None image_url
         if image_url and existing.image_url == "/placeholder-product.jpg":
             existing.image_url = image_url
         
@@ -167,6 +174,7 @@ async def _upsert_product(
         source="open_beauty_facts",
         source_id=source_id,
         last_seen_at=now,
+        inci_ingredients=inci_ingredients,
     )
     db.add(product)
     await db.flush()  # Get product ID
@@ -256,10 +264,13 @@ async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
                                     stats["skipped"] += 1
                                     continue
 
-                                # Extract filter values from product name/description
-                                filters = extract_filters_from_obf_product(
-                                    category_key, item
-                                )
+                                # Extract ingredients
+                                ingredients = item.get("ingredients_text_en") or item.get("ingredients_text")
+                                if ingredients:
+                                    # OBF ingredients are often a comma-separated string
+                                    ingredient_list = [i.strip() for i in ingredients.split(",") if i.strip()]
+                                else:
+                                    ingredient_list = None
 
                                 outcome = await _upsert_product(
                                     db,
@@ -267,10 +278,11 @@ async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
                                     name=name,
                                     brand_id=brand_id,
                                     category_key=category_key,
-                                    image_url=item.get("image_url"),
+                                    image_url=None,  # Do not set image from OBF, force retailer image
                                     description=item.get("generic_name", "").strip() or None,
                                     source_id=barcode,
                                     filters=filters,
+                                    inci_ingredients=ingredient_list,
                                 )
                                 stats[outcome] += 1
                         except Exception as exc:
