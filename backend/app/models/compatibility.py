@@ -39,3 +39,20 @@ class CompatibilityResult(Base, TimestampMixin):
 
     # Read-only relationships (no back_populates to avoid modifying existing models)
     product: Mapped["Product"] = relationship(viewonly=True)  # noqa: F821
+
+
+class ChemistKnownIngredient(Base, TimestampMixin):
+    """
+    Reference table of INCI ingredient names grouped by conflict category.
+
+    Used by the chemist agent to identify which ingredients belong to each
+    chemical family (silicone, AHA, BHA, retinoid, oxidizer, vitamin_c,
+    copper_peptide, niacinamide) when evaluating product compatibility.
+    Sourced from INCIDecoder, EU CosIng, and CosDNA.
+    """
+    __tablename__ = "chemist_known_ingredients"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    inci_name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    conflict_category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
