@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { CategoryKey, Product, CategoryDefinition, CompatibilityMap } from "@/types";
 import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
-import { readBuildSlots, saveBuildSlot, saveBuildProductToCache } from "@/lib/buildSlots";
+import { readBuildSlots, saveBuildSlot, saveBuildProductToCache, readBuildProductCache } from "@/lib/buildSlots";
 import { getQuizAutoFilters } from "@/lib/personalization";
 import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2 } from "lucide-react";
 import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
@@ -31,6 +31,9 @@ export default function CategoryPage() {
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
   const [hasQuizFilters, setHasQuizFilters] = useState(false);
+
+  // Snapshot of already-built products for conflict name lookup
+  const [productCache] = useState(() => readBuildProductCache());
 
   // Compatibility state
   const [compatibilityMap, setCompatibilityMap] = useState<CompatibilityMap>({});
@@ -231,7 +234,7 @@ export default function CategoryPage() {
             map[pid] = {
               isCompatible: raw.is_compatible,
               reason: raw.reason,
-              severity: raw.severity,
+              severity: raw.severity as "error" | "warning",
               sourceAgent: raw.source_agent,
               conflictingProductIds: raw.conflicting_product_ids ?? [],
             };
@@ -477,7 +480,15 @@ export default function CategoryPage() {
                                                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest font-sans transition-all duration-500 ${isError ? "bg-red-500 text-white" : "bg-amber-100 text-amber-800"}`}>
                                                     {isError ? "✕ Conflict" : "! Warning"}
                                                 </span>
-                                                <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-56 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
+                                                <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
+                                                    {compat.conflictingProductIds.length > 0 && (
+                                                        <div className="mb-2 pb-2 border-b border-border/20">
+                                                            <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">Conflicts with</p>
+                                                            {compat.conflictingProductIds.map((id) => (
+                                                                <p key={id} className="text-[10px] font-bold text-foreground font-sans leading-snug">{getDisplayName(productCache[id]?.name ?? "another product")}</p>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                     <p className="text-[10px] font-medium leading-relaxed text-foreground font-sans">{compat.reason}</p>
                                                 </div>
                                             </div>
@@ -557,7 +568,15 @@ export default function CategoryPage() {
                                         <div className={`animate-slide-in rounded-full px-2 py-1 text-[7px] font-bold uppercase tracking-widest backdrop-blur-sm shadow-sm ${isError ? "bg-red-500/90 text-white" : "bg-amber-100/90 text-amber-800"}`}>
                                             {isError ? "✕ Conflict" : "! Warning"}
                                         </div>
-                                        <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-48 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
+                                        <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-56 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
+                                            {compat.conflictingProductIds.length > 0 && (
+                                                <div className="mb-2 pb-2 border-b border-border/20">
+                                                    <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">Conflicts with</p>
+                                                    {compat.conflictingProductIds.map((id) => (
+                                                        <p key={id} className="text-[10px] font-bold text-foreground font-sans leading-snug">{getDisplayName(productCache[id]?.name ?? "another product")}</p>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <p className="text-[10px] font-medium leading-relaxed text-foreground font-sans">{compat.reason}</p>
                                         </div>
                                     </div>

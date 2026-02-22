@@ -42,6 +42,39 @@ def _is_quota_error(exc: Exception) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Application-zone mapping for product categories.
+#
+# Layering conflicts (silicone/oil over water-based) only matter when two
+# products are applied to the SAME area of the face.  Mascara + blush, for
+# example, never physically layer, so silicone/water rules must not fire
+# across zones.
+# ---------------------------------------------------------------------------
+
+_CATEGORY_ZONE: dict[str, str] = {
+    # Face base + complexion
+    "foundation": "face", "concealer": "face", "primer": "face",
+    "powder": "face", "setting-spray": "face",
+    # Cheeks / contouring (still the face canvas)
+    "blush": "face", "bronzer": "face", "highlighter": "face", "contour": "face",
+    # Eye area
+    "eyeshadow": "eye", "eyeliner": "eye", "mascara": "eye", "false-lashes": "eye",
+    # Brow area
+    "brow-pencil": "brow", "brow-gel": "brow",
+    # Lip area
+    "lipstick": "lip", "lip-gloss": "lip", "lip-liner": "lip",
+}
+
+# Patterns whose conflicts are about physical LAYERING ORDER.
+# These should only fire when both products sit in the same application zone.
+# Active-ingredient conflicts (retinol, AHAs, etc.) are systemic — they fire
+# regardless of zone because skin absorbs them from any applied area.
+_LAYERING_PATTERNS: frozenset[str] = frozenset({
+    "dimethicone", "cyclopentasiloxane", "cyclomethicone",
+    "mineral oil", "isopropyl myristate",
+})
+
+
+# ---------------------------------------------------------------------------
 # Known ingredient conflict rules
 # Each entry: (pattern_a, pattern_b, severity, reason)
 # Patterns are lowercase substrings matched against INCI ingredient names.
@@ -191,6 +224,14 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
 
                 if not ((a_has_a and b_has_b) or (a_has_b and b_has_a)):
                     continue
+
+                # Layering conflicts are only meaningful when both products are
+                # applied to the same area of the face.  Skip cross-zone pairs.
+                if pattern_a in _LAYERING_PATTERNS or pattern_b in _LAYERING_PATTERNS:
+                    zone_a = _CATEGORY_ZONE.get(prod_a.category, "unknown")
+                    zone_b = _CATEGORY_ZONE.get(prod_b.category, "unknown")
+                    if zone_a != zone_b:
+                        continue
 
                 # Flag both products in the pair
                 for flagged_id, conflict_id in [
