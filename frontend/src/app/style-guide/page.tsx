@@ -89,7 +89,7 @@ export default function StyleGuidePage() {
       description: 'Dewy complexion products and lightweight layers.',
       direction: 'rising',
       products: [demoProduct],
-      videos: ['https://example.com/video'],
+      videos: [{ title: 'Glass Skin Tutorial', url: 'https://example.com/video' }],
       articles: [{ title: 'Why dewy makeup is back', url: 'https://example.com/article' }],
     }),
     [demoProduct]

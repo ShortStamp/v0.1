@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./shortstamp.db"
+    database_ssl: bool = False  # Set True when connecting to Supabase or any hosted PostgreSQL
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
@@ -13,7 +14,7 @@ class Settings(BaseSettings):
     walmart_api_key: str = ""
     walmart_private_key_path: str = ""
     walmart_private_key_pem: str = ""  # PEM key content as env var (alternative to file)
-    enable_scheduler: bool = True
+    enable_scheduler: bool = False  # Scheduler moved to ingestion microservice
     enable_retailer_scraper: bool = True
     retailer_scrape_max_pages_per_term: int = 1
     retailer_scrape_terms: str = ""
@@ -42,7 +43,7 @@ class Settings(BaseSettings):
     amazon_partner_tag: str = ""
     serpapi_key: str = ""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

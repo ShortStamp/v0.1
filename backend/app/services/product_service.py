@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from urllib.parse import parse_qs, unquote, urlparse
@@ -166,6 +167,20 @@ def _apply_attribute_filters(query, count_query, filters: dict[str, str] | None 
     return query, count_query
 
 
+def _has_valid_price_subquery():
+    """Subquery: product has at least one price row with a real purchase URL."""
+    return (
+        sa_select(ProductPrice.id)
+        .where(
+            ProductPrice.product_id == Product.id,
+            ProductPrice.url.notin_(["#", ""]),
+            ProductPrice.url.isnot(None),
+        )
+        .correlate(Product)
+        .exists()
+    )
+
+
 async def list_products(
     db: AsyncSession,
     category: str | None = None,
@@ -175,9 +190,12 @@ async def list_products(
     page: int = 1,
     per_page: int = 20,
 ) -> PaginatedProducts:
+    has_valid_price = _has_valid_price_subquery()
+
     query = (
         select(Product)
         .where(Product.is_active == True)  # noqa: E712
+        .where(has_valid_price)
         .options(
             selectinload(Product.brand),
             selectinload(Product.prices).selectinload(ProductPrice.retailer),
@@ -185,7 +203,11 @@ async def list_products(
         )
     )
 
-    count_query = select(func.count(Product.id)).where(Product.is_active == True)  # noqa: E712
+    count_query = (
+        select(func.count(Product.id))
+        .where(Product.is_active == True)  # noqa: E712
+        .where(has_valid_price)
+    )
 
     query, count_query = _apply_category_and_search_filters(
         query, count_query, category=category, search=search

@@ -68,15 +68,15 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (config: google.accounts.id.client.Config) => void;
-          prompt: (callback?: (notification: google.accounts.id.CredentialResponse) => void) => void;
+          initialize: (config: unknown) => void;
+          prompt: (callback?: (notification: unknown) => void) => void;
         };
       };
     };
     AppleID?: {
       auth: {
-        init: (config: AppleID.auth.ClientConfig) => void;
-        signIn: () => Promise<AppleID.Authorization>;
+        init: (config: unknown) => void;
+        signIn: () => Promise<unknown>;
       };
     };
   }
@@ -204,7 +204,7 @@ export default function QuizPage() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  async function handleGoogleResponse(response: google.accounts.id.CredentialResponse) {
+  async function handleGoogleResponse(response: { credential: string }) {
     setAuthLoading(true);
     setAuthError("");
     try {
@@ -230,7 +230,7 @@ export default function QuizPage() {
     setAuthLoading(true);
     setAuthError("");
     try {
-      const response = await window.AppleID?.auth.signIn();
+      const response = await window.AppleID?.auth.signIn() as { authorization?: { id_token?: string }; user?: unknown } | undefined;
       if (response?.authorization?.id_token) {
         await loginWithApple(
           response.authorization.id_token,
