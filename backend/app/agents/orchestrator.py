@@ -145,7 +145,11 @@ async def artist_node(state: AgentState) -> dict:
         errors = list(state.errors)
         if output.quota_exceeded:
             errors.append("quota_exceeded")
-        return {"artist_results": output.results, "errors": errors}
+        return {
+            "artist_results": output.results,
+            "has_physical_failure": output.has_physical_failure,
+            "errors": errors,
+        }
     except Exception as exc:
         logger.error("Artist agent failed: %s", exc)
         return {"errors": [*state.errors, f"artist: {exc}"]}
@@ -175,22 +179,37 @@ async def aggregate_node(state: AgentState) -> dict:
     compatibility_map: dict = {}
     compatibility_map.update(state.chemist_results)
     # Artist results fill in products not already flagged by chemist;
-    # if both agents flag the same product, chemist (formulation conflict) wins.
+    # if both agents flag the same product, chemist (formulation conflict) wins
+    # UNLESS artist detected a physical texture error — those override chemist compatible.
     for pid, resp in state.artist_results.items():
         if pid not in compatibility_map:
             compatibility_map[pid] = resp
         else:
-            # Escalate to error if artist found a harder conflict on a warned product
             existing = compatibility_map[pid]
-            if resp.severity == "error" and existing.severity == "warning":
-                compatibility_map[pid] = resp
+            is_artist_physical_error = (
+                resp.severity == "error"
+                and ("Texture Conflict" in resp.reason or "Powder Sandwich" in resp.reason)
+            )
+            if is_artist_physical_error:
+                # Merge traces from both agents
+                merged_trace = list(existing.debug_trace) + [
+                    f"ORCHESTRATOR: artist physical error overrides chemist ({existing.severity})"
+                ] + list(resp.debug_trace)
+                compatibility_map[pid] = resp.model_copy(update={"debug_trace": merged_trace})
+            elif resp.severity == "error" and existing.severity == "warning":
+                merged_trace = list(existing.debug_trace) + [
+                    f"ORCHESTRATOR: artist error escalates over chemist warning"
+                ] + list(resp.debug_trace)
+                compatibility_map[pid] = resp.model_copy(update={"debug_trace": merged_trace})
     compatibility_map.update(state.trend_results)
 
     # Compute overall score
-    # Each error deducts 0.30, each warning deducts 0.10; floor at 0.0
+    has_physical_failure = state.has_physical_failure
     num_errors = sum(1 for r in compatibility_map.values() if r.severity == "error")
     num_warnings = sum(1 for r in compatibility_map.values() if r.severity == "warning")
-    score = max(0.0, 1.0 - (num_errors * 0.30 + num_warnings * 0.10))
+    base_score = max(0.0, 1.0 - (num_errors * 0.30 + num_warnings * 0.10))
+    # Physical failures cap the score at 0.1
+    score = min(base_score, 0.1) if has_physical_failure else base_score
 
     now = datetime.now(timezone.utc)
 
@@ -200,6 +219,7 @@ async def aggregate_node(state: AgentState) -> dict:
         application_order=state.application_order,
         evaluated_at=now,
         overall_compatibility_score=round(score, 4),
+        has_physical_failure=has_physical_failure,
         errors=list(dict.fromkeys(state.errors)),  # deduplicate while preserving order
     )
 

@@ -101,6 +101,7 @@ export interface BeautyProfile {
   coverage: string;
   finish: string;
   budget: string;
+  concerns?: string[];
 }
 
 export interface CompatibilityInfo {
@@ -109,6 +110,7 @@ export interface CompatibilityInfo {
   severity: "warning" | "error";
   sourceAgent: string;
   conflictingProductIds: string[];
+  debugTrace: string[];
 }
 
 export type CompatibilityMap = Record<string, CompatibilityInfo>;

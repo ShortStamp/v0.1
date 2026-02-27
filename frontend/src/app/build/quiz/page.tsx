@@ -33,6 +33,8 @@ import {
   Shuffle,
   ArrowLeft,
   Check,
+  Eye,
+  Pencil,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +63,8 @@ const iconMap: Record<string, LucideIcon> = {
   wallet: Wallet,
   crown: Crown,
   shuffle: Shuffle,
+  eye: Eye,
+  pencil: Pencil,
 };
 
 declare global {
@@ -88,6 +92,7 @@ export default function QuizPage() {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Partial<BeautyProfile>>({});
   const [selected, setSelected] = useState<string | null>(null);
+  const [multiSelected, setMultiSelected] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -123,6 +128,14 @@ export default function QuizPage() {
 
   const advance = useCallback(
     (value: string) => {
+      // Multi-select questions toggle values in multiSelected state
+      if (question.multiSelect) {
+        setMultiSelected((prev) =>
+          prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+        );
+        return;
+      }
+
       const key = question.key;
       const updated = { ...answers, [key]: value };
       setAnswers(updated);
@@ -141,10 +154,25 @@ export default function QuizPage() {
     [answers, question, step, total]
   );
 
+  const confirmMultiSelect = useCallback(() => {
+    const key = question.key;
+    const updated = { ...answers, [key]: multiSelected };
+    setAnswers(updated);
+    setMultiSelected([]);
+
+    if (step + 1 < total) {
+      setStep(step + 1);
+    } else {
+      localStorage.setItem("beautyProfile", JSON.stringify(updated));
+      setDone(true);
+    }
+  }, [answers, question, step, total, multiSelected]);
+
   const goBack = () => {
     if (step > 0) {
       setStep(step - 1);
       setSelected(null);
+      setMultiSelected([]);
     }
   };
 
@@ -415,6 +443,7 @@ export default function QuizPage() {
                 setStep(0);
                 setAnswers({});
                 setSelected(null);
+                setMultiSelected([]);
               }}
               className="py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 transition-colors hover:text-accent font-sans"
             >
@@ -470,16 +499,20 @@ export default function QuizPage() {
         <div className={`grid w-full max-w-3xl gap-3 ${gridCols}`}>
           {question.options.map((opt) => {
             const Icon = iconMap[opt.icon] ?? Circle;
-            const isSelected = selected === opt.value;
+            const isMulti = question.multiSelect;
+            const isSelected = isMulti
+              ? multiSelected.includes(opt.value)
+              : selected === opt.value;
             const previousAnswer = answers[question.key];
-            const wasPreviouslyChosen =
-              previousAnswer === opt.value && selected === null;
+            const wasPreviouslyChosen = isMulti
+              ? false
+              : previousAnswer === opt.value && selected === null;
 
             return (
               <button
                 key={opt.value}
                 onClick={() => advance(opt.value)}
-                disabled={selected !== null}
+                disabled={!isMulti && selected !== null}
                 className={`group relative flex flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center transition-all duration-200 ${
                   isSelected
                     ? "border-accent bg-accent text-white shadow-lg shadow-accent/20"
@@ -488,6 +521,13 @@ export default function QuizPage() {
                       : "border-border/50 bg-white hover:border-accent hover:shadow-lg hover:shadow-accent/5 hover:-translate-y-0.5"
                 }`}
               >
+                {/* Check indicator for multi-select */}
+                {isMulti && isSelected && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="h-4 w-4 text-white" />
+                  </div>
+                )}
+
                 {/* Icon */}
                 <Icon
                   className={`h-6 w-6 transition-colors duration-200 ${
@@ -522,6 +562,29 @@ export default function QuizPage() {
             );
           })}
         </div>
+
+        {/* Confirm / Skip buttons for multi-select questions */}
+        {question.multiSelect && (
+          <div className="mt-6 flex items-center gap-4">
+            {question.optional && (
+              <button
+                onClick={confirmMultiSelect}
+                className="px-6 py-3 text-xs font-bold uppercase tracking-[0.15em] text-foreground/40 transition-colors hover:text-accent font-sans"
+              >
+                Skip
+              </button>
+            )}
+            <button
+              onClick={confirmMultiSelect}
+              disabled={!question.optional && multiSelected.length === 0}
+              className="rounded-2xl bg-accent px-8 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-accent/20 transition-all hover:bg-pink-deep hover:shadow-pink-deep/30 hover:-translate-y-0.5 disabled:opacity-50 font-sans"
+            >
+              {multiSelected.length > 0
+                ? `Continue (${multiSelected.length})`
+                : "Continue"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

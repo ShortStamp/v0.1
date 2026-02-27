@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CategoryKey, ToolboxSlot, Product } from "@/types";
 import { categoryDefinitions, categoryGroups } from "@/lib/data";
 import { readBuildSlots, removeBuildSlot, readBuildProductCache } from "@/lib/buildSlots";
+import { ConflictBadge } from "@/components/DebugTrace";
 import {
   ArrowLeft,
   Plus,
@@ -207,28 +208,13 @@ export default function GroupPage() {
                         ) : (() => {
                             const compat = compatibilityMap[slot.product!.id];
                             if (!compat) return null;
-                            const isError = compat.severity === "error";
                             return (
-                            <div
-                                className={`group/tooltip relative mt-3 cursor-default rounded-full px-2 py-1 ${
-                                isError ? "bg-red-500 text-white" : "bg-amber-100 text-amber-800"
-                                }`}
-                            >
-                                <p className="text-[8px] font-bold uppercase tracking-[0.1em] font-sans flex items-center gap-1">
-                                {isError ? "✕ Conflict" : "! Warning"}
-                                </p>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 z-50 mb-2 hidden w-56 rounded-xl border border-border bg-white p-3 shadow-xl group-hover/tooltip:block text-left">
-                                {compat.conflictingProductIds.length > 0 && (
-                                    <div className="mb-2 pb-2 border-b border-border/20">
-                                        <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">Conflicts with</p>
-                                        {compat.conflictingProductIds.map((id) => {
-                                            const name = slots.find((s) => s.product?.id === id)?.product?.name;
-                                            return <p key={id} className="text-[10px] font-bold text-foreground font-sans leading-snug">{getDisplayName(name ?? "another product")}</p>;
-                                        })}
-                                    </div>
-                                )}
-                                <p className="text-[10px] font-medium leading-relaxed text-foreground font-sans">{compat.reason}</p>
-                                </div>
+                            <div className="mt-3">
+                                <ConflictBadge
+                                    compat={compat}
+                                    resolveName={(id) => getDisplayName(slots.find((s) => s.product?.id === id)?.product?.name ?? "another product")}
+                                    position="above"
+                                />
                             </div>
                             );
                         })()}

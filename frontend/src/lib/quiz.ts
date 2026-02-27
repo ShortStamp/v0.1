@@ -12,6 +12,8 @@ export interface QuizQuestion {
   title: string;
   subtitle: string;
   options: QuizOption[];
+  multiSelect?: boolean;  // true for multi-select questions (e.g. concerns)
+  optional?: boolean;      // true if user can skip this question
 }
 
 export const quizQuestions: QuizQuestion[] = [
@@ -79,6 +81,19 @@ export const quizQuestions: QuizQuestion[] = [
       { label: "Mid-range", value: "midrange", icon: "wallet", description: "$15 – $35 — the sweet spot" },
       { label: "High-end", value: "highend", icon: "crown", description: "$35+ — treat yourself" },
       { label: "Mix", value: "mix", icon: "shuffle", description: "A little of everything" },
+    ],
+  },
+  {
+    key: "concerns",
+    title: "Do you have any of these concerns?",
+    subtitle: "Select all that apply — or skip if none. This helps us fine-tune product checks.",
+    multiSelect: true,
+    optional: true,
+    options: [
+      { label: "Dark Circles", value: "dark_circles", icon: "eye", description: "Discoloration under the eyes" },
+      { label: "Dry Under-Eyes", value: "dry_under_eye", icon: "wind", description: "Flaky or tight skin under eyes" },
+      { label: "Fine Lines", value: "fine_lines", icon: "pencil", description: "Visible lines around eyes or mouth" },
+      { label: "Redness", value: "redness", icon: "flame", description: "Redness or irritation on cheeks/nose" },
     ],
   },
 ];

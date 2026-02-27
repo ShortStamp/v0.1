@@ -227,7 +227,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
           const candidateSet = new Set(candidateIds);
           const map: CompatibilityMap = {};
           for (const [pid, raw] of Object.entries(
-            (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: "error" | "warning"; source_agent: string; conflicting_product_ids?: string[] }>
+            (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: "error" | "warning"; source_agent: string; conflicting_product_ids?: string[]; debug_trace?: string[] }>
           )) {
             if (!candidateSet.has(pid)) continue;
             map[pid] = {
@@ -236,6 +236,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
               severity: raw.severity,
               sourceAgent: raw.source_agent,
               conflictingProductIds: raw.conflicting_product_ids ?? [],
+              debugTrace: raw.debug_trace ?? [],
             };
           }
           setCompatibilityMap(map);

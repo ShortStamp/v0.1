@@ -11,6 +11,7 @@ import Link from "next/link";
 import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2, ExternalLink } from "lucide-react";
 import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 import { getProductColorInfo } from "@/lib/productColor";
+import { ConflictBadge } from "@/components/DebugTrace";
 
 type ViewMode = "tiles" | "list";
 const PER_PAGE = 20;
@@ -229,7 +230,7 @@ export default function CategoryPage() {
           const candidateSet = new Set(candidateIds);
           const map: CompatibilityMap = {};
           for (const [pid, raw] of Object.entries(
-            (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: string; source_agent: string; conflicting_product_ids?: string[] }>
+            (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: string; source_agent: string; conflicting_product_ids?: string[]; debug_trace?: string[] }>
           )) {
             if (!candidateSet.has(pid)) continue;
             map[pid] = {
@@ -238,6 +239,7 @@ export default function CategoryPage() {
               severity: raw.severity as "error" | "warning",
               sourceAgent: raw.source_agent,
               conflictingProductIds: raw.conflicting_product_ids ?? [],
+              debugTrace: raw.debug_trace ?? [],
             };
           }
           setCompatibilityMap(map);
@@ -477,22 +479,11 @@ export default function CategoryPage() {
                                             <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-white font-sans transition-all duration-500 group-hover:bg-accent">! API Quota</span>
                                         )}
                                         {hasConflict && (
-                                            <div className="group/tooltip relative inline-block cursor-default">
-                                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest font-sans transition-all duration-500 ${isError ? "bg-red-500 text-white" : "bg-amber-100 text-amber-800"}`}>
-                                                    {isError ? "✕ Conflict" : "! Warning"}
-                                                </span>
-                                                <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
-                                                    {compat.conflictingProductIds.length > 0 && (
-                                                        <div className="mb-2 pb-2 border-b border-border/20">
-                                                            <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">Conflicts with</p>
-                                                            {compat.conflictingProductIds.map((id) => (
-                                                                <p key={id} className="text-[10px] font-bold text-foreground font-sans leading-snug">{getDisplayName(productCache[id]?.name ?? "another product")}</p>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                    <p className="text-[10px] font-medium leading-relaxed text-foreground font-sans">{compat.reason}</p>
-                                                </div>
-                                            </div>
+                                            <ConflictBadge
+                                                compat={compat}
+                                                resolveName={(id) => getDisplayName(productCache[id]?.name ?? "another product")}
+                                                position="above"
+                                            />
                                         )}
                                     </div>
                                     </div>
@@ -565,22 +556,11 @@ export default function CategoryPage() {
                                     <div className="animate-slide-in rounded-full bg-foreground/90 px-2 py-1 text-[7px] font-bold uppercase tracking-widest text-white backdrop-blur-sm shadow-sm">! API Quota</div>
                                 )}
                                 {hasConflict && (
-                                    <div className="group/tooltip relative inline-block cursor-default">
-                                        <div className={`animate-slide-in rounded-full px-2 py-1 text-[7px] font-bold uppercase tracking-widest backdrop-blur-sm shadow-sm ${isError ? "bg-red-500/90 text-white" : "bg-amber-100/90 text-amber-800"}`}>
-                                            {isError ? "✕ Conflict" : "! Warning"}
-                                        </div>
-                                        <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-56 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
-                                            {compat.conflictingProductIds.length > 0 && (
-                                                <div className="mb-2 pb-2 border-b border-border/20">
-                                                    <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">Conflicts with</p>
-                                                    {compat.conflictingProductIds.map((id) => (
-                                                        <p key={id} className="text-[10px] font-bold text-foreground font-sans leading-snug">{getDisplayName(productCache[id]?.name ?? "another product")}</p>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <p className="text-[10px] font-medium leading-relaxed text-foreground font-sans">{compat.reason}</p>
-                                        </div>
-                                    </div>
+                                    <ConflictBadge
+                                        compat={compat}
+                                        resolveName={(id) => getDisplayName(productCache[id]?.name ?? "another product")}
+                                        position="below"
+                                    />
                                 )}
                             </div>
 

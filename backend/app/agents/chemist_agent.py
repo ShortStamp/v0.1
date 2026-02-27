@@ -53,6 +53,13 @@ def _is_quota_error(exc: Exception) -> bool:
 # products are applied to the SAME area of the face.  Mascara + blush, for
 # example, never physically layer, so silicone/water rules must not fire
 # across zones.
+#
+# Zone Isolation (critical):
+#   - "lash" is its own zone.  Mascara adheres to hair/keratin cuticles,
+#     NOT to skin.  It never physically layers with eyeliner or eyeshadow,
+#     so silicone-in-mascara + water-in-liner is a ZERO interaction.
+#   - "eye" covers products applied to the lid skin (shadow, liner).
+#   - False lashes are adhesive-mounted, separate from both.
 # ---------------------------------------------------------------------------
 
 _CATEGORY_ZONE: dict[str, str] = {
@@ -61,8 +68,10 @@ _CATEGORY_ZONE: dict[str, str] = {
     "powder": "face", "setting-spray": "face",
     # Cheeks / contouring (still the face canvas)
     "blush": "face", "bronzer": "face", "highlighter": "face", "contour": "face",
-    # Eye area
-    "eyeshadow": "eye", "eyeliner": "eye", "mascara": "eye", "false-lashes": "eye",
+    # Eye area — lid skin only
+    "eyeshadow": "eye", "eyeliner": "eye",
+    # Lash zone — adheres to hair, not skin
+    "mascara": "lash", "false-lashes": "lash",
     # Brow area
     "brow-pencil": "brow", "brow-gel": "brow",
     # Lip area
@@ -76,6 +85,24 @@ _CATEGORY_ZONE: dict[str, str] = {
 _LAYERING_PATTERNS: frozenset[str] = frozenset({
     "dimethicone", "cyclopentasiloxane", "cyclomethicone",
     "mineral oil", "isopropyl myristate",
+})
+
+# ---------------------------------------------------------------------------
+# Fixed-form (solid/wax) categories — exempt from silicone-vs-water pilling.
+#
+# Pilling happens when two liquid/cream films try to "knit" together on skin.
+# Wax pencils, pressed/loose powders, and mascara are solid-state or
+# wax-emulsion products that sit ON TOP of a film — they smudge or flake,
+# but they do not pill.  Flagging dimethicone in an eyeliner pencil as a
+# "pilling risk" against a water-based eyeshadow is technically wrong and
+# makes the app look unreliable.
+# ---------------------------------------------------------------------------
+
+_FIXED_FORM_CATEGORIES: frozenset[str] = frozenset({
+    "mascara", "eyeliner", "eyeshadow",
+    "brow-pencil", "brow-gel",
+    "powder",
+    "lip-liner",
 })
 
 
@@ -211,6 +238,194 @@ def _ingredient_position(pattern: str, inci_list: list[str]) -> int:
     return 999
 
 
+def _top5_contains(product: ProductSnapshot, markers: tuple[str, ...]) -> bool:
+    """Check if any of the markers appear in the product's top-5 INCI ingredients."""
+    top5 = [ing.lower() for ing in (product.inci_ingredients or [])[:5]]
+    return any(m in ing for ing in top5 for m in markers)
+
+
+# ---------------------------------------------------------------------------
+# Solvency check — alcohol/solvent lifting risk
+# ---------------------------------------------------------------------------
+
+_SOLVENT_MARKERS = ("alcohol denat", "propanediol")
+_SOLVENCY_TARGET_CATEGORIES = frozenset({"foundation", "concealer", "primer"})
+
+
+def _run_solvency_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityResponse]:
+    """
+    For each product pair where B is in a later application step than A:
+    If B's top-5 INCI contains a solvent AND A is a base category → flag A with lifting risk.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+
+    for prod_a in products:
+        if prod_a.category not in _SOLVENCY_TARGET_CATEGORIES:
+            continue
+        step_a = _CATEGORY_STEP.get(prod_a.category, 500)
+
+        for prod_b in products:
+            if prod_b.id == prod_a.id:
+                continue
+            # Fixed-form products (pencils, powders, mascara) don't deliver
+            # solvents to the skin film — skip them as a solvent source.
+            if prod_b.category in _FIXED_FORM_CATEGORIES:
+                continue
+            step_b = _CATEGORY_STEP.get(prod_b.category, 500)
+            if step_b <= step_a:
+                continue
+
+            if not _top5_contains(prod_b, _SOLVENT_MARKERS):
+                continue
+
+            # Flag prod_a — the base layer at risk of being dissolved
+            reason = (
+                f"Lifting Risk: {prod_b.name} contains solvent "
+                f"(alcohol denat/propanediol) that can dissolve {prod_a.name} underneath."
+            )[:300]
+            if prod_a.id not in results:
+                results[prod_a.id] = CompatibilityResponse(
+                    is_compatible=False,
+                    reason=reason,
+                    severity="warning",
+                    source_agent="chemist",
+                    conflicting_product_ids=[prod_b.id],
+                )
+            else:
+                existing = results[prod_a.id]
+                results[prod_a.id] = existing.model_copy(update={
+                    "conflicting_product_ids": list({*existing.conflicting_product_ids, prod_b.id}),
+                })
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# SPF anchor — oil-heavy SPF over water-based primer
+# ---------------------------------------------------------------------------
+
+_UV_FILTER_INCI = (
+    "ethylhexyl methoxycinnamate", "zinc oxide", "titanium dioxide",
+    "avobenzone", "homosalate", "octinoxate", "octocrylene",
+)
+_OIL_HEAVY_MARKERS = (
+    "mineral oil", "caprylic/capric triglyceride", "isopropyl myristate",
+    "ethylhexyl palmitate", "squalane",
+)
+
+
+def _run_spf_anchor_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityResponse]:
+    """
+    Detect oil-heavy SPF products. If a water-based primer exists in the build,
+    flag the primer with a sliding risk error.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+
+    # Find SPF products (by INCI or name)
+    spf_products: list[ProductSnapshot] = []
+    for p in products:
+        name_lower = p.name.lower()
+        specs_lower = " ".join(p.specs or []).lower()
+        has_uv_inci = _top5_contains(p, _UV_FILTER_INCI)
+        has_spf_name = "spf" in name_lower or "spf" in specs_lower
+        if has_uv_inci or has_spf_name:
+            spf_products.append(p)
+
+    # Check if any SPF product is oil-heavy
+    oil_heavy_spf = [p for p in spf_products if _top5_contains(p, _OIL_HEAVY_MARKERS)]
+    if not oil_heavy_spf:
+        return results
+
+    # Find water-based or hybrid primers in the build
+    # (hybrid primers still have a water phase that won't adhere to oil)
+    water_primers = [
+        p for p in products
+        if p.category == "primer" and _formula_type(p) in ("water", "hybrid")
+    ]
+
+    for primer in water_primers:
+        for spf in oil_heavy_spf:
+            reason = (
+                f"Sliding Risk: water-based primer over oil-heavy SPF ({spf.name}) "
+                "will not adhere — expect migration and breakdown."
+            )[:300]
+            if primer.id not in results:
+                results[primer.id] = CompatibilityResponse(
+                    is_compatible=False,
+                    reason=reason,
+                    severity="error",
+                    source_agent="chemist",
+                    conflicting_product_ids=[spf.id],
+                )
+            else:
+                existing = results[primer.id]
+                results[primer.id] = existing.model_copy(update={
+                    "conflicting_product_ids": list({*existing.conflicting_product_ids, spf.id}),
+                    "severity": "error",
+                })
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Drying speed pilling — fast-drying over slow-drying in same zone
+# ---------------------------------------------------------------------------
+
+_FAST_DRY_MARKERS = ("alcohol denat", "sd alcohol", "isopropyl alcohol")
+_SLOW_DRY_MARKERS = ("mineral oil", "petrolatum", "lanolin", "caprylic/capric triglyceride")
+
+
+def _run_drying_speed_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityResponse]:
+    """
+    If a fast-drying product layers over a slow-drying product (same zone,
+    later step) → flag with rolling/pilling risk.
+    Skips fixed-form categories (pencils, powders, mascara) — they don't pill.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+
+    for slow_prod in products:
+        if slow_prod.category in _FIXED_FORM_CATEGORIES:
+            continue
+        if not _top5_contains(slow_prod, _SLOW_DRY_MARKERS):
+            continue
+        slow_step = _CATEGORY_STEP.get(slow_prod.category, 500)
+        slow_zone = _CATEGORY_ZONE.get(slow_prod.category, "unknown")
+
+        for fast_prod in products:
+            if fast_prod.id == slow_prod.id:
+                continue
+            if fast_prod.category in _FIXED_FORM_CATEGORIES:
+                continue
+            if not _top5_contains(fast_prod, _FAST_DRY_MARKERS):
+                continue
+            fast_step = _CATEGORY_STEP.get(fast_prod.category, 500)
+            fast_zone = _CATEGORY_ZONE.get(fast_prod.category, "unknown")
+
+            # Must be same zone and fast product applied later
+            if fast_zone != slow_zone or fast_step <= slow_step:
+                continue
+
+            reason = (
+                f"Rolling/Pilling Risk: fast-drying alcohol formula ({fast_prod.name}) "
+                f"over slow-drying oil-rich cream ({slow_prod.name}) causes balling."
+            )[:300]
+            if fast_prod.id not in results:
+                results[fast_prod.id] = CompatibilityResponse(
+                    is_compatible=False,
+                    reason=reason,
+                    severity="warning",
+                    source_agent="chemist",
+                    conflicting_product_ids=[slow_prod.id],
+                )
+            else:
+                existing = results[fast_prod.id]
+                results[fast_prod.id] = existing.model_copy(update={
+                    "conflicting_product_ids": list({*existing.conflicting_product_ids, slow_prod.id}),
+                })
+
+    return results
+
+
 def _run_skin_type_pass(
     products: list[ProductSnapshot], skin_type: str | None
 ) -> dict[str, CompatibilityResponse]:
@@ -250,19 +465,98 @@ def _run_skin_type_pass(
 
 
 # ---------------------------------------------------------------------------
-# Formula type helper + application order builder
+# Weighted formula classification — Polar vs Non-Polar
+#
+# INCI lists are ordered by concentration (highest first).  We compute a
+# weighted score across two axes:
+#
+#   Weight(index) = 1.0 - (index * 0.2)      [index 0..4]
+#
+#     Position 0 → 1.0  (base of the formula)
+#     Position 1 → 0.8
+#     Position 2 → 0.6
+#     Position 3 → 0.4
+#     Position 4 → 0.2
+#
+# Polar score  — water / humectant phase
+# Non-Polar score — silicones + heavy oils + esters + waxes (the "lipid" phase)
+#
+# The real conflict is Polar vs Non-Polar.  Silicone-vs-water is the most
+# cited, but "Water + Oils" vs "Water + Silicones" pills just as badly.
+# Grouping all non-polar film-formers into a single score catches the full
+# range of incompatibilities.
+#
+# If the scores are within a 0.4 margin, the product is "hybrid" — a W/Si
+# emulsion intentionally designed to bridge both phases.  Most modern
+# foundations have water at #1 simply to keep the formula pourable, with
+# the functional base being silicone/oil at positions 2-3.  A 0.4 gap
+# accounts for this market reality.
 # ---------------------------------------------------------------------------
 
+_POLAR_MARKERS: tuple[str, ...] = ("aqua", "water", "eau")
+_NONPOLAR_MARKERS: tuple[str, ...] = (
+    # Silicones
+    "dimethicone", "cyclopentasiloxane", "cyclomethicone", "trimethylsiloxysilicate",
+    "cyclotetrasiloxane", "phenyl trimethicone", "caprylyl methicone",
+    # Silicone-like volatile solvents
+    "isododecane",
+    # Heavy oils / esters / waxes that form a non-polar film
+    "mineral oil", "paraffinum liquidum", "petrolatum",
+    "isopropyl myristate", "isopropyl palmitate",
+    "cetyl ethylhexanoate", "ethylhexyl palmitate",
+    "caprylic/capric triglyceride",
+    "isostearyl neopentanoate", "octyldodecanol",
+)
+
+_HYBRID_MARGIN = 0.4   # scores within this margin → hybrid classification
+
+
+class FormulaProfile:
+    """Weighted formula analysis for a single product."""
+    __slots__ = ("polar_score", "nonpolar_score", "base_type")
+
+    def __init__(self, product: ProductSnapshot) -> None:
+        top5 = [ing.lower() for ing in (product.inci_ingredients or [])[:5]]
+        p_score = 0.0
+        np_score = 0.0
+        for idx, ing in enumerate(top5):
+            weight = 1.0 - (idx * 0.2)
+            if any(m in ing for m in _POLAR_MARKERS):
+                p_score += weight
+            if any(m in ing for m in _NONPOLAR_MARKERS):
+                np_score += weight
+        self.polar_score = round(p_score, 2)
+        self.nonpolar_score = round(np_score, 2)
+
+        diff = abs(self.polar_score - self.nonpolar_score)
+        if self.polar_score == 0.0 and self.nonpolar_score == 0.0:
+            self.base_type: Literal["water", "silicone", "hybrid", "other"] = "other"
+        elif diff <= _HYBRID_MARGIN and self.polar_score > 0 and self.nonpolar_score > 0:
+            self.base_type = "hybrid"
+        elif self.polar_score > self.nonpolar_score:
+            self.base_type = "water"
+        elif self.nonpolar_score > self.polar_score:
+            self.base_type = "silicone"
+        else:
+            self.base_type = "hybrid"  # exact tie with both > 0
+
+    @property
+    def is_hybrid(self) -> bool:
+        return self.base_type == "hybrid"
+
+    # Back-compat aliases used in reason strings and LLM summaries
+    @property
+    def water_score(self) -> float:
+        return self.polar_score
+
+    @property
+    def silicone_score(self) -> float:
+        return self.nonpolar_score
+
+
 def _formula_type(product: ProductSnapshot) -> str:
-    """Classify a product's base formula from its top-5 INCI ingredients."""
-    top5 = [ing.lower() for ing in (product.inci_ingredients or [])[:5]]
-    water_markers = ("aqua", "water", "eau")
-    silicone_markers = ("dimethicone", "cyclopentasiloxane", "cyclomethicone", "trimethylsiloxysilicate")
-    if any(m in ing for ing in top5 for m in water_markers):
-        return "water"
-    if any(m in ing for ing in top5 for m in silicone_markers):
-        return "silicone"
-    return "other"
+    """Classify a product's base formula using weighted INCI scoring."""
+    return FormulaProfile(product).base_type
 
 
 _CATEGORY_STEP: dict[str, int] = {
@@ -273,9 +567,11 @@ _CATEGORY_STEP: dict[str, int] = {
     "lip-liner": 40, "lipstick": 50, "lip-gloss": 60,
     "setting-spray": 1000,
 }
-_FORMULA_OFFSET: dict[str, int] = {"water": 0, "other": 1, "silicone": 2}
+# Hybrid sorts between water and silicone in application order
+_FORMULA_OFFSET: dict[str, int] = {"water": 0, "hybrid": 1, "other": 2, "silicone": 3}
 _FORMULA_NOTES: dict[str, str] = {
     "water": "Apply first — water-based formula",
+    "hybrid": "Hybrid formula — compatible with both water and silicone layers",
     "silicone": "Apply after water-based products — silicone-based formula",
 }
 
@@ -294,8 +590,8 @@ def _build_application_order(products: list[ProductSnapshot]) -> list[Applicatio
 
     steps: list[ApplicationStep] = []
     for idx, product in enumerate(sorted_products, start=1):
-        formula = _formula_type(product)
-        note = _FORMULA_NOTES.get(formula)
+        fp = FormulaProfile(product)
+        note = _FORMULA_NOTES.get(fp.base_type)
         steps.append(ApplicationStep(
             product_id=product.id,
             product_name=product.name,
@@ -335,8 +631,26 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
     """
     Iterate all product pairs against KNOWN_CONFLICTS.
     Returns a dict of product_id → CompatibilityResponse for conflicting products only.
+    Each response includes a debug_trace showing every decision step.
     """
     results: dict[str, CompatibilityResponse] = {}
+    # Per-product trace accumulator — collects lines even across multiple pair checks
+    traces: dict[str, list[str]] = {}
+
+    # Pre-compute formula profiles for all products (used in traces + logic)
+    profiles: dict[str, FormulaProfile] = {p.id: FormulaProfile(p) for p in products}
+
+    # Log formula classification for every product
+    for p in products:
+        fp = profiles[p.id]
+        traces.setdefault(p.id, []).append(
+            f"FORMULA: {fp.base_type} — polar={fp.polar_score} nonpolar={fp.nonpolar_score} "
+            f"(zone={_CATEGORY_ZONE.get(p.category, '?')}, "
+            f"fixed_form={p.category in _FIXED_FORM_CATEGORIES})"
+        )
+        if p.inci_ingredients:
+            top5 = [ing[:35] for ing in p.inci_ingredients[:5]]
+            traces[p.id].append(f"INCI top-5: {top5}")
 
     # Build normalized ingredient sets per product
     product_ingredients: dict[str, set[str]] = {}
@@ -356,6 +670,8 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
 
             ings_a = product_ingredients[prod_a.id]
             ings_b = product_ingredients[prod_b.id]
+            fp_a = profiles[prod_a.id]
+            fp_b = profiles[prod_b.id]
 
             for pattern_a, pattern_b, severity, reason in KNOWN_CONFLICTS:
                 a_has_a = any(pattern_a in ing for ing in ings_a)
@@ -366,19 +682,38 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                 if not ((a_has_a and b_has_b) or (a_has_b and b_has_a)):
                     continue
 
-                # Layering conflicts are only meaningful when both products are
-                # applied to the same area of the face.  Skip cross-zone pairs.
+                pair_label = f"{prod_a.name[:25]}×{prod_b.name[:25]}"
+
+                # ── Gate: fixed-form + zone checks for layering patterns ──
                 if pattern_a in _LAYERING_PATTERNS or pattern_b in _LAYERING_PATTERNS:
+                    if (
+                        prod_a.category in _FIXED_FORM_CATEGORIES
+                        or prod_b.category in _FIXED_FORM_CATEGORIES
+                    ):
+                        msg = f"SKIP fixed-form: {pair_label} — {pattern_a}/{pattern_b} ignored (wax/powder/pencil)"
+                        traces.setdefault(prod_a.id, []).append(msg)
+                        traces.setdefault(prod_b.id, []).append(msg)
+                        continue
                     zone_a = _CATEGORY_ZONE.get(prod_a.category, "unknown")
                     zone_b = _CATEGORY_ZONE.get(prod_b.category, "unknown")
                     if zone_a != zone_b:
+                        msg = f"SKIP cross-zone: {pair_label} — zone {zone_a}≠{zone_b}"
+                        traces.setdefault(prod_a.id, []).append(msg)
+                        traces.setdefault(prod_b.id, []).append(msg)
                         continue
 
-                # Concentration check — if both triggering patterns appear at
-                # position ≥ 15 in their respective INCI lists (trace level),
-                # downgrade error → warning and annotate the reason.
+                # Pattern matched — start building the trace
                 effective_severity = severity
                 effective_reason = reason
+
+                traces.setdefault(prod_a.id, []).append(
+                    f"MATCH: {pattern_a}+{pattern_b} → initial severity={severity}"
+                )
+                traces.setdefault(prod_b.id, []).append(
+                    f"MATCH: {pattern_a}+{pattern_b} → initial severity={severity}"
+                )
+
+                # ── Concentration downgrade ──
                 pos_a = min(
                     _ingredient_position(pattern_a, prod_a.inci_ingredients),
                     _ingredient_position(pattern_b, prod_a.inci_ingredients),
@@ -390,12 +725,63 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                 if severity == "error" and pos_a >= 15 and pos_b >= 15:
                     effective_severity = "warning"
                     effective_reason = reason + " (trace concentrations — lower risk)"
+                    msg = f"DOWNGRADE trace-conc: pos_a={pos_a} pos_b={pos_b} → warning"
+                    traces[prod_a.id].append(msg)
+                    traces[prod_b.id].append(msg)
+
+                # ── Hybrid de-escalation ──
+                is_layering = pattern_a in _LAYERING_PATTERNS or pattern_b in _LAYERING_PATTERNS
+                if effective_severity == "error" and is_layering:
+                    if fp_a.is_hybrid or fp_b.is_hybrid:
+                        effective_severity = "warning"
+                        hybrid_name = prod_a.name if fp_a.is_hybrid else prod_b.name
+                        fp_h = fp_a if fp_a.is_hybrid else fp_b
+                        effective_reason = (
+                            f"Reduced pilling risk: {hybrid_name} is a hybrid formula "
+                            f"(polar {fp_h.polar_score}/non-polar {fp_h.nonpolar_score}) "
+                            f"designed to bridge both base types — monitor but not critical."
+                        )[:300]
+                        msg = (
+                            f"DOWNGRADE hybrid: {hybrid_name[:30]} is hybrid "
+                            f"(polar={fp_h.polar_score}, nonpolar={fp_h.nonpolar_score}, "
+                            f"gap={abs(fp_h.polar_score - fp_h.nonpolar_score):.1f}≤{_HYBRID_MARGIN}) → warning"
+                        )
+                        traces[prod_a.id].append(msg)
+                        traces[prod_b.id].append(msg)
+
+                # ── Protective Buffer ──
+                if is_layering and effective_severity in ("error", "warning"):
+                    step_a = _CATEGORY_STEP.get(prod_a.category, 500)
+                    step_b = _CATEGORY_STEP.get(prod_b.category, 500)
+                    lo_step, hi_step = min(step_a, step_b), max(step_a, step_b)
+                    buffer_product = None
+                    for p in products:
+                        if p.id == prod_a.id or p.id == prod_b.id:
+                            continue
+                        p_step = _CATEGORY_STEP.get(p.category, 500)
+                        if lo_step < p_step < hi_step and profiles[p.id].is_hybrid:
+                            buffer_product = p
+                            break
+                    if buffer_product:
+                        msg = (
+                            f"KILLED by buffer: {buffer_product.name[:30]} (hybrid) sits between "
+                            f"step {lo_step}..{hi_step} — conflict eliminated"
+                        )
+                        traces[prod_a.id].append(msg)
+                        traces[prod_b.id].append(msg)
+                        continue  # skip this conflict entirely
+
+                # ── Final verdict trace ──
+                msg = f"VERDICT: {effective_severity} — {effective_reason[:80]}"
+                traces[prod_a.id].append(msg)
+                traces[prod_b.id].append(msg)
 
                 # Flag both products in the pair
                 for flagged_id, conflict_id in [
                     (prod_a.id, prod_b.id),
                     (prod_b.id, prod_a.id),
                 ]:
+                    trace = traces.get(flagged_id, [])
                     if flagged_id not in results:
                         results[flagged_id] = CompatibilityResponse(
                             is_compatible=False,
@@ -403,13 +789,13 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                             severity=effective_severity,  # type: ignore[arg-type]
                             source_agent="chemist",
                             conflicting_product_ids=[conflict_id],
+                            debug_trace=list(trace),
                         )
                     else:
                         existing = results[flagged_id]
                         new_conflicting = list(
                             {*existing.conflicting_product_ids, conflict_id}
                         )
-                        # Escalate severity if new conflict is worse
                         new_severity = (
                             "error"
                             if effective_severity == "error" or existing.severity == "error"
@@ -421,6 +807,7 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                             severity=new_severity,  # type: ignore[arg-type]
                             source_agent="chemist",
                             conflicting_product_ids=new_conflicting,
+                            debug_trace=list(trace),
                         )
 
     return results
@@ -453,10 +840,12 @@ async def _run_llm_pass(
             indexed_ings = ", ".join(p.specs or []) or "No ingredient data available"
             data_quality = "No INCI data — specs/description only"
 
+        fp = FormulaProfile(p)
         product_summaries.append(
             f"Product ID: {p.id}\n"
             f"Name: {p.name} by {p.brand}\n"
             f"Category: {p.category}\n"
+            f"Formula base: {fp.base_type} (polar={fp.polar_score}, non-polar={fp.nonpolar_score})\n"
             f"Data quality: {data_quality}\n"
             f"Ingredients/specs: {indexed_ings}"
         )
@@ -496,16 +885,37 @@ RULE-BASED FINDINGS (already detected):
 
 TASK: Identify any additional formulation conflicts NOT already captured above.
 Focus on:
-- Silicone-based vs water-based layering order issues
+- Silicone-based vs water-based layering order issues (COMPLEXION ONLY — see exclusions below)
 - pH-sensitive actives (AHAs, BHAs, vitamin C, retinoids)
 - Oxidizing agents conflicting with antioxidants or retinoids
-- Oil-based vs water-based incompatibilities
-- Finish conflicts (e.g. high-shine gloss over matte foundation)
+- Oil-based vs water-based incompatibilities (liquid/cream products on skin only)
+- Solvency / lifting risks from alcohol-heavy products over base layers
+- SPF + primer layering physics (oil-heavy sunscreen under water-based primer)
+- Drying speed mismatches causing pilling (fast-drying alcohol over slow-drying oil)
+- Application order impossibilities
+
+FORMULA CLASSIFICATION: Each product has a polar (water) and non-polar (silicone/oil/ester) score.
+- "water" = polar-dominant. "silicone" = non-polar-dominant. "hybrid" = balanced (gap ≤ 0.4).
+- Hybrid formulas are W/Si emulsions designed to bridge both phases.
+- Do NOT flag hybrid products for pilling as an error — at most a warning.
+- If a hybrid product sits BETWEEN a water and silicone product in application order,
+  it acts as a chemical bridge — do NOT flag ANY pilling conflict in that sequence.
+
+CRITICAL EXCLUSIONS — do NOT flag these as conflicts:
+- Mascara vs eyeliner: these are in separate interaction zones (lash vs lid skin).
+  Mascara adheres to hair/keratin cuticles, not to eyeliner. Dimethicone in liner
+  is a waterproofing benefit, not a conflict with mascara.
+- Silicone/water pilling for SOLID-STATE products: pencils, powders, mascaras, and
+  wax-based products do NOT form liquid films that can pill or separate. Only flag
+  silicone-vs-water conflicts between liquid/cream products that must knit together
+  on skin (primer, foundation, concealer, liquid blush, etc.).
+- Any "conflict" between products that never physically touch each other on the face.
 
 Ingredient list positions are provided (1 = highest concentration). Ingredients at position ≥ 15
 are present at trace levels — note this context when assessing severity.
 
-Only flag genuine chemical/formulation conflicts. Do not flag stylistic preferences.
+Only flag genuine chemical/formulation conflicts between products that physically layer.
+Do not flag stylistic preferences. Do not flag solid/wax products for pilling.
 If no additional conflicts exist beyond the rule findings, return an empty verdicts list.
 If INCI data is missing, note "Limited analysis: no INCI data available" in the reason."""
 
@@ -520,24 +930,87 @@ If INCI data is missing, note "Limited analysis: no INCI data available" in the 
         logger.warning("Chemist LLM call failed: %s", exc)
         return rule_findings
 
-    # Merge LLM results with rule findings (LLM can only raise severity)
+    # Merge LLM results with rule findings (LLM can only raise severity).
+    #
+    # CRITICAL: The LLM sometimes ignores prompt instructions and flags
+    # layering conflicts on fixed-form or cross-zone products anyway.
+    # We hard-filter those out here so hallucinated verdicts never reach
+    # the user.  Prompt compliance is aspirational; code is authoritative.
     merged = dict(rule_findings)
+
+    # Build lookup for post-LLM filtering
+    product_by_id = {p.id: p for p in products}
+
+    # Layering-related keywords that should ONLY apply to liquid/cream
+    # complexion products in the same zone — never to fixed-form categories.
+    _LAYERING_KEYWORDS = frozenset({
+        "silicone", "pilling", "pill", "water-based", "adhesion",
+        "separation", "dimethicone", "cyclopentasiloxane", "cyclomethicone",
+        "layering", "repel",
+    })
 
     for verdict in llm_output.verdicts:
         pid = verdict.product_id
+        product = product_by_id.get(pid)
+
+        # ── Post-LLM guard: reject layering verdicts on fixed-form products ──
+        if product and product.category in _FIXED_FORM_CATEGORIES:
+            reason_lower = verdict.reason.lower()
+            if any(kw in reason_lower for kw in _LAYERING_KEYWORDS):
+                logger.debug(
+                    "LLM guard: stripped layering verdict on fixed-form %s (%s): %s",
+                    product.category, product.name, verdict.reason[:80],
+                )
+                if pid in merged:
+                    merged[pid].debug_trace.append(
+                        f"LLM STRIPPED: fixed-form guard blocked — {verdict.reason[:60]}"
+                    )
+                continue
+
+        # ── Post-LLM guard: reject cross-zone layering verdicts ──
+        if product and verdict.conflicting_product_ids:
+            product_zone = _CATEGORY_ZONE.get(product.category, "unknown")
+            reason_lower = verdict.reason.lower()
+            is_layering_reason = any(kw in reason_lower for kw in _LAYERING_KEYWORDS)
+            if is_layering_reason:
+                all_cross_zone = all(
+                    _CATEGORY_ZONE.get(
+                        product_by_id[cid].category, "unknown"
+                    ) != product_zone
+                    for cid in verdict.conflicting_product_ids
+                    if cid in product_by_id
+                )
+                if all_cross_zone:
+                    logger.debug(
+                        "LLM guard: stripped cross-zone layering verdict on %s (%s): %s",
+                        product.category, product.name, verdict.reason[:80],
+                    )
+                    if pid in merged:
+                        merged[pid].debug_trace.append(
+                            f"LLM STRIPPED: cross-zone guard blocked — {verdict.reason[:60]}"
+                        )
+                    continue
+
+        # Build LLM trace entry
+        llm_trace = f"LLM ADDED: {verdict.severity} — {verdict.reason[:80]}"
+
+        # Preserve existing debug_trace from rule pass
+        existing_trace = list(merged[pid].debug_trace) if pid in merged else []
+        existing_trace.append(llm_trace)
+
         llm_resp = CompatibilityResponse(
             is_compatible=verdict.is_compatible,
             reason=verdict.reason,
             severity=verdict.severity,
             source_agent="chemist",
             conflicting_product_ids=verdict.conflicting_product_ids,
+            debug_trace=existing_trace,
         )
 
         if pid not in merged:
             merged[pid] = llm_resp
         else:
             existing = merged[pid]
-            # LLM can only raise severity, never lower
             if verdict.severity == "error" and existing.severity == "warning":
                 merged[pid] = CompatibilityResponse(
                     is_compatible=False,
@@ -547,14 +1020,14 @@ If INCI data is missing, note "Limited analysis: no INCI data available" in the 
                     conflicting_product_ids=list(
                         {*existing.conflicting_product_ids, *verdict.conflicting_product_ids}
                     ),
+                    debug_trace=existing_trace,
                 )
             else:
-                # Keep existing severity, add any new conflicting IDs from LLM
                 new_ids = list(
                     {*existing.conflicting_product_ids, *verdict.conflicting_product_ids}
                 )
                 merged[pid] = existing.model_copy(
-                    update={"conflicting_product_ids": new_ids}
+                    update={"conflicting_product_ids": new_ids, "debug_trace": existing_trace}
                 )
 
     return merged
@@ -563,6 +1036,52 @@ If INCI data is missing, note "Limited analysis: no INCI data available" in the 
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
+def _build_base_traces(products: list[ProductSnapshot]) -> dict[str, list[str]]:
+    """
+    Pre-compute formula profile trace lines for every product in the build.
+    These are prepended to every CompatibilityResponse so the debug panel
+    always shows what the system "sees" for each product regardless of
+    which pass ultimately flags it.
+    """
+    traces: dict[str, list[str]] = {}
+    for p in products:
+        fp = FormulaProfile(p)
+        lines: list[str] = [
+            f"FORMULA: {fp.base_type} — polar={fp.polar_score} nonpolar={fp.nonpolar_score} "
+            f"(zone={_CATEGORY_ZONE.get(p.category, '?')}, "
+            f"fixed_form={p.category in _FIXED_FORM_CATEGORIES})",
+        ]
+        if p.inci_ingredients:
+            top5 = [ing[:35] for ing in p.inci_ingredients[:5]]
+            lines.append(f"INCI top-5: {top5}")
+        else:
+            lines.append("INCI: no data")
+        traces[p.id] = lines
+    return traces
+
+
+def _inject_base_traces(
+    results: dict[str, CompatibilityResponse],
+    base_traces: dict[str, list[str]],
+) -> dict[str, CompatibilityResponse]:
+    """
+    Prepend base formula traces to every result.  If a response already has
+    traces from the rule pass, the base lines go first (deduped).
+    """
+    for pid, resp in results.items():
+        base = base_traces.get(pid, [])
+        if not base:
+            continue
+        # Dedupe: if the rule pass already logged these, skip them
+        existing_set = set(resp.debug_trace)
+        new_trace = [line for line in base if line not in existing_set]
+        if new_trace:
+            results[pid] = resp.model_copy(
+                update={"debug_trace": new_trace + list(resp.debug_trace)}
+            )
+    return results
+
 
 async def run_chemist_analysis(
     products: list[ProductSnapshot],
@@ -584,6 +1103,9 @@ async def run_chemist_analysis(
 
     skin_type = beauty_profile.skin_type if beauty_profile else None
 
+    # Pre-compute base traces for every product (formula profile + INCI top-5)
+    base_traces = _build_base_traces(products)
+
     rule_findings = _run_rule_pass(products)
 
     if not rule_findings:
@@ -591,15 +1113,48 @@ async def run_chemist_analysis(
 
     # Skin-type pass — rule findings take precedence on conflict
     skin_findings = _run_skin_type_pass(products, skin_type)
+    # Add trace for skin-type hits
+    for pid, resp in skin_findings.items():
+        resp.debug_trace.append(f"SKIN-TYPE: {skin_type} → {resp.reason[:60]}")
+
     combined: dict[str, CompatibilityResponse] = {**skin_findings}
     combined.update(rule_findings)
+
+    # Physical interaction passes — merge into combined (higher severity wins)
+    pass_names = ["solvency", "spf_anchor", "drying_speed"]
+    for pass_name, physical_results in zip(pass_names, [
+        _run_solvency_pass(products),
+        _run_spf_anchor_pass(products),
+        _run_drying_speed_pass(products),
+    ]):
+        for pid, resp in physical_results.items():
+            # Tag the result with which pass created it
+            resp.debug_trace.append(f"PHYSICAL ({pass_name}): {resp.reason[:60]}")
+            if pid not in combined:
+                combined[pid] = resp
+            else:
+                existing = combined[pid]
+                if resp.severity == "error" and existing.severity == "warning":
+                    # Carry forward existing traces when overwriting
+                    resp.debug_trace = existing.debug_trace + resp.debug_trace
+                    combined[pid] = resp
+                elif resp.severity == existing.severity and resp.severity == "warning":
+                    combined[pid] = existing.model_copy(update={
+                        "conflicting_product_ids": list(
+                            {*existing.conflicting_product_ids, *resp.conflicting_product_ids}
+                        ),
+                        "debug_trace": existing.debug_trace + resp.debug_trace,
+                    })
 
     try:
         merged = await _run_llm_pass(products, combined, skin_type=skin_type)
     except QuotaExceededError:
-        # Return deterministic findings only; flag quota error for the frontend
         order = _build_application_order(products)
+        combined = _inject_base_traces(combined, base_traces)
         return ChemistOutput(results=combined, quota_exceeded=True, application_order=order)
+
+    # Inject base formula traces into every final result
+    merged = _inject_base_traces(merged, base_traces)
 
     order = _build_application_order(products)
     return ChemistOutput(results=merged, application_order=order)

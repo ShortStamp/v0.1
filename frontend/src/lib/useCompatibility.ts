@@ -52,6 +52,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
           coverage: p.coverage || null,
           finish: p.finish || null,
           budget: p.budget || null,
+          concerns: Array.isArray(p.concerns) ? p.concerns : [],
         };
       } catch { return null; }
     })();
@@ -75,7 +76,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
 
         const map: CompatibilityMap = {};
         for (const [productId, raw] of Object.entries(
-          (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: string; source_agent: string; conflicting_product_ids?: string[] }>
+          (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: string; source_agent: string; conflicting_product_ids?: string[]; debug_trace?: string[] }>
         )) {
           map[productId] = {
             isCompatible: raw.is_compatible,
@@ -83,6 +84,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
             severity: raw.severity,
             sourceAgent: raw.source_agent,
             conflictingProductIds: raw.conflicting_product_ids ?? [],
+            debugTrace: raw.debug_trace ?? [],
           };
         }
         setCompatibilityMap(map);

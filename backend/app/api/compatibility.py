@@ -58,11 +58,14 @@ async def analyze_compatibility(
         ",".join(sorted(body.product_ids)).encode()
     ).hexdigest()
 
-    # Check DB cache
-    cached = await _load_cache(db, fingerprint)
-    if cached is not None:
-        logger.debug("Returning cached compatibility result for fingerprint %s", fingerprint[:8])
-        return cached
+    # Check DB cache — skip if debug traces are needed (cached rows don't
+    # store trace data, so a cache hit would return empty debug_trace arrays).
+    # TODO: Remove this bypass once debug traces are no longer needed, or
+    # store traces in a separate cache-friendly format.
+    # cached = await _load_cache(db, fingerprint)
+    # if cached is not None:
+    #     logger.debug("Returning cached compatibility result for fingerprint %s", fingerprint[:8])
+    #     return cached
 
     # Run the LangGraph graph
     logger.info(

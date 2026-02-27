@@ -34,6 +34,10 @@ class CompatibilityResponse(BaseModel):
         default_factory=list,
         description="Other product IDs in the build that caused this conflict",
     )
+    debug_trace: list[str] = Field(
+        default_factory=list,
+        description="Step-by-step decision log for debugging (shown in frontend dev panel)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +68,10 @@ class OrchestratorOutput(BaseModel):
         ge=0.0, le=1.0,
         description="1.0 = fully compatible, 0.0 = severe conflicts",
     )
+    has_physical_failure: bool = Field(
+        default=False,
+        description="True when Artist Agent detected a physical texture conflict (score capped at 0.1)",
+    )
     # Agent-level error tags — e.g. "quota_exceeded" when Gemini returns 429
     errors: list[str] = Field(default_factory=list)
 
@@ -85,6 +93,10 @@ class ProductSnapshot(BaseModel):
     )
     specs: list[str] = Field(default_factory=list)
     filters: dict[str, str | bool | float] = Field(default_factory=dict)
+    glow_score: int = Field(
+        default=0,
+        description="Luminosity score (1-5) computed by Artist Agent at analysis time",
+    )
 
 
 class BeautyProfileSnapshot(BaseModel):
@@ -95,6 +107,10 @@ class BeautyProfileSnapshot(BaseModel):
     coverage: str | None = None     # light | medium | full
     finish: str | None = None       # matte | dewy | natural | satin
     budget: str | None = None
+    concerns: list[str] = Field(
+        default_factory=list,
+        description="User concerns e.g. ['dark_circles', 'dry_under_eye', 'fine_lines', 'redness']",
+    )
 
 
 class TrendSnapshot(BaseModel):
@@ -131,6 +147,10 @@ class AgentState(BaseModel):
     artist_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
     trend_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
     application_order: list["ApplicationStep"] = Field(default_factory=list)
+    has_physical_failure: bool = Field(
+        default=False,
+        description="Set by Artist Agent when a physical texture conflict (e.g. powder sandwich) is detected",
+    )
 
     # Final merged output — set by aggregate_node, read by API endpoint
     final_output: OrchestratorOutput | None = None
@@ -192,6 +212,10 @@ class ArtistInput(BaseModel):
 
 class ArtistOutput(BaseModel):
     results: dict[str, CompatibilityResponse]
+    has_physical_failure: bool = Field(
+        default=False,
+        description="True when a physical texture conflict (e.g. powder sandwich) is detected",
+    )
     quota_exceeded: bool = Field(
         default=False,
         description="True when the LLM call failed with a 429 quota/rate-limit error",

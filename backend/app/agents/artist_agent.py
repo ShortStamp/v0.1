@@ -16,7 +16,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.agents.base_agent import get_llm
-from app.agents.chemist_agent import QuotaExceededError, _is_quota_error
+from app.agents.chemist_agent import QuotaExceededError, _is_quota_error, _CATEGORY_STEP
 from app.schemas.compatibility import (
     ArtistOutput,
     BeautyProfileSnapshot,
@@ -114,7 +114,7 @@ AESTHETIC_RULES: list[tuple[str, str, str, str, str, str]] = [
         "warning",
         "This formula targets dry skin and may feel too rich or heavy on oily skin.",
     ),
-    # --- Undertone mismatches ---
+    # --- Undertone mismatches (warning level — escalated to error for foundation/concealer below) ---
     (
         "undertone", "cool",
         "undertone", "warm",
@@ -128,6 +128,202 @@ AESTHETIC_RULES: list[tuple[str, str, str, str, str, str]] = [
         "This cool-toned formula may clash with your warm undertone; look for neutral or warm-toned shades.",
     ),
 ]
+
+# Categories where undertone mismatches are escalated to error severity
+_UNDERTONE_ERROR_CATEGORIES = frozenset({"foundation", "concealer"})
+
+
+# ---------------------------------------------------------------------------
+# Powder sandwich blocker — cream/liquid over powder = mud
+# ---------------------------------------------------------------------------
+
+# Categories that are always powder
+_ALWAYS_POWDER = frozenset({"powder"})
+# Categories that are inherently liquid/cream (no formula filter needed)
+_INHERENTLY_LIQUID = frozenset({"concealer"})
+# Categories that CAN be powder or cream/liquid based on formula filter
+_FORMULA_VARIABLE = frozenset({"blush", "bronzer", "contour", "highlighter"})
+
+
+def _run_powder_sandwich_pass(
+    products: list[ProductSnapshot],
+) -> tuple[dict[str, CompatibilityResponse], bool]:
+    """
+    Detect cream/liquid products layered OVER powder products in the same zone.
+    Returns (results_dict, has_physical_failure).
+    """
+    results: dict[str, CompatibilityResponse] = {}
+    has_failure = False
+
+    # Classify products as powder or liquid/cream
+    powder_products: list[ProductSnapshot] = []
+    liquid_products: list[ProductSnapshot] = []
+
+    for p in products:
+        formula = str(p.filters.get("formula", "")).lower()
+        if p.category in _ALWAYS_POWDER or (p.category in _FORMULA_VARIABLE and formula == "powder"):
+            powder_products.append(p)
+        elif p.category in _INHERENTLY_LIQUID or (
+            p.category in _FORMULA_VARIABLE and formula in ("cream", "liquid")
+        ):
+            liquid_products.append(p)
+
+    # Check: liquid/cream product with higher step than a powder product
+    from app.agents.chemist_agent import _CATEGORY_ZONE
+
+    for liq in liquid_products:
+        liq_step = _CATEGORY_STEP.get(liq.category, 500)
+        liq_zone = _CATEGORY_ZONE.get(liq.category, "unknown")
+
+        for pwd in powder_products:
+            pwd_step = _CATEGORY_STEP.get(pwd.category, 500)
+            pwd_zone = _CATEGORY_ZONE.get(pwd.category, "unknown")
+
+            if liq_zone != pwd_zone or liq_step <= pwd_step:
+                continue
+
+            has_failure = True
+            reason = (
+                f"Texture Conflict: applying {liq.name} (cream/liquid) over "
+                f"{pwd.name} (powder) creates mud — cream/liquid must go under powder."
+            )[:300]
+            if liq.id not in results:
+                results[liq.id] = CompatibilityResponse(
+                    is_compatible=False,
+                    reason=reason,
+                    severity="error",
+                    source_agent="artist",
+                    conflicting_product_ids=[pwd.id],
+                )
+            else:
+                existing = results[liq.id]
+                results[liq.id] = existing.model_copy(update={
+                    "conflicting_product_ids": list({*existing.conflicting_product_ids, pwd.id}),
+                })
+
+    return results, has_failure
+
+
+# ---------------------------------------------------------------------------
+# Glow score — cumulative luminosity check
+# ---------------------------------------------------------------------------
+
+_GLOW_CATEGORIES = frozenset({"primer", "foundation", "highlighter"})
+
+
+def _compute_glow_score(product: ProductSnapshot) -> int:
+    """Compute a luminosity score (1-5) for a single product."""
+    finish = str(product.filters.get("finish", "")).lower()
+    intensity = str(product.filters.get("intensity", "")).lower()
+    formula = str(product.filters.get("formula", "")).lower()
+    cheek_cats = {"blush", "bronzer", "contour", "highlighter"}
+
+    score = 1  # default
+
+    if finish in ("dewy", "luminous"):
+        score = 4
+    elif finish == "satin":
+        score = 3
+    elif finish in ("shimmer", "glitter"):
+        score = 5
+
+    if intensity == "blinding":
+        score = 5
+    elif intensity == "intense":
+        score = max(score, 4)
+    elif intensity == "subtle":
+        score = max(score, 2)
+
+    if formula in ("cream", "liquid") and product.category in cheek_cats:
+        score = min(score + 1, 5)
+
+    return score
+
+
+def _run_glow_check(
+    products: list[ProductSnapshot],
+) -> dict[str, CompatibilityResponse]:
+    """
+    Sum glow scores for primer + foundation + highlighter.
+    If sum > 12 → flag all three with surface instability warning.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+
+    glow_products = [p for p in products if p.category in _GLOW_CATEGORIES]
+    if not glow_products:
+        return results
+
+    total = sum(_compute_glow_score(p) for p in glow_products)
+
+    if total > 12:
+        all_ids = [p.id for p in glow_products]
+        for p in glow_products:
+            others = [pid for pid in all_ids if pid != p.id]
+            results[p.id] = CompatibilityResponse(
+                is_compatible=False,
+                reason=(
+                    f"Surface Instability: cumulative glow score {total}/15 — "
+                    "excess luminosity causes grease migration and breakdown."
+                ),
+                severity="warning",
+                source_agent="artist",
+                conflicting_product_ids=others,
+            )
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Under-eye aging check
+# ---------------------------------------------------------------------------
+
+
+def _run_under_eye_check(
+    products: list[ProductSnapshot],
+    profile: BeautyProfileSnapshot,
+) -> dict[str, CompatibilityResponse]:
+    """
+    Flag full-coverage matte concealer on dry under-eyes without hydrating primer.
+    Triggers when skin_type is dry OR concerns include dark_circles/dry_under_eye.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+
+    # Check trigger conditions
+    concerns = [c.lower() for c in (profile.concerns or [])]
+    skin_type = (profile.skin_type or "").lower()
+    triggered = skin_type == "dry" or "dark_circles" in concerns or "dry_under_eye" in concerns
+    if not triggered:
+        return results
+
+    # Find concealer with full coverage + matte finish
+    concealers = [p for p in products if p.category == "concealer"]
+    for conc in concealers:
+        coverage = str(conc.filters.get("coverage", "")).lower()
+        finish = str(conc.filters.get("finish", "")).lower()
+        if coverage != "full" or finish != "matte":
+            continue
+
+        # Check if any primer has type=Hydrating
+        has_hydrating_primer = any(
+            p.category == "primer"
+            and str(p.filters.get("type", "")).lower() == "hydrating"
+            for p in products
+        )
+        if has_hydrating_primer:
+            continue
+
+        results[conc.id] = CompatibilityResponse(
+            is_compatible=False,
+            reason=(
+                "Creasing/Aging Risk: full-coverage matte concealer on dry under-eyes "
+                "without hydrating prep will settle into fine lines."
+            ),
+            severity="warning",
+            source_agent="artist",
+            conflicting_product_ids=[],
+        )
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -182,12 +378,28 @@ def _run_rule_pass(
             if filter_substr not in product_val:
                 continue
 
+            # Escalate undertone mismatches to error for foundation/concealer
+            effective_severity = severity
+            effective_reason = reason
+            if (
+                filter_key == "undertone"
+                and product.category in _UNDERTONE_ERROR_CATEGORIES
+            ):
+                effective_severity = "error"
+                # Build a more specific reason for color integrity
+                user_ut = profile_substr
+                prod_ut = filter_substr
+                effective_reason = (
+                    f"Color Integrity Error: {prod_ut}-toned formula against your "
+                    f"{user_ut} undertone creates visible color dissonance on the face."
+                )
+
             # Rule fires — flag this product
             if product.id not in results:
                 results[product.id] = CompatibilityResponse(
                     is_compatible=False,
-                    reason=reason,
-                    severity=severity,  # type: ignore[arg-type]
+                    reason=effective_reason,
+                    severity=effective_severity,  # type: ignore[arg-type]
                     source_agent="artist",
                     conflicting_product_ids=[],
                 )
@@ -195,13 +407,13 @@ def _run_rule_pass(
                 existing = results[product.id]
                 new_severity = (
                     "error"
-                    if severity == "error" or existing.severity == "error"
+                    if effective_severity == "error" or existing.severity == "error"
                     else "warning"
                 )
                 # Keep the reason from the higher-severity rule
                 keep_reason = (
-                    reason
-                    if severity == "error" and existing.severity != "error"
+                    effective_reason
+                    if effective_severity == "error" and existing.severity != "error"
                     else existing.reason
                 )
                 results[product.id] = CompatibilityResponse(
@@ -290,9 +502,11 @@ TASK: Identify any additional aesthetic mismatches NOT already captured above.
 Consider:
 - Finish harmony: does the product finish suit the user's skin type and finish preference?
 - Coverage alignment: does the coverage level match the user's stated preference?
-- Shade compatibility: does the product's tone/undertone suit the user's skin tone and undertone?
+- Color integrity: does the product's tone/undertone suit the user's skin tone and undertone? Undertone clashes on foundation/concealer are errors, not just warnings.
+- Powder sandwich / texture layering violations (cream/liquid over powder = mud)
+- Cumulative luminosity / grease risk from too many dewy/shimmer products
+- Under-eye creasing from matte concealer over dry skin without hydrating prep
 - Category-level aesthetics: e.g. heavy full-glam contouring over sheer base looks mismatched
-- Product combinations that clash visually (e.g. bold glitter eye + heavy concealer for daytime)
 
 Focus on genuine compatibility issues, not personal taste. Be concise (max 250 chars per reason).
 If no additional mismatches exist beyond the rule findings, return an empty verdicts list."""
@@ -308,11 +522,35 @@ If no additional mismatches exist beyond the rule findings, return an empty verd
         logger.warning("Artist LLM call failed, returning rule findings only: %s", exc)
         return rule_findings
 
-    # Merge: LLM can only raise severity, never lower it
+    # Merge: LLM can only raise severity, never lower it.
+    #
+    # Post-LLM guard: strip layering/pilling verdicts the LLM hallucinates
+    # on fixed-form categories.  Same logic as the Chemist Agent guard.
+    from app.agents.chemist_agent import _FIXED_FORM_CATEGORIES
+
+    _LAYERING_KEYWORDS = frozenset({
+        "silicone", "pilling", "pill", "water-based", "adhesion",
+        "separation", "dimethicone", "cyclopentasiloxane", "cyclomethicone",
+        "layering", "repel",
+    })
+
     merged = dict(rule_findings)
+    product_by_id = {p.id: p for p in products}
 
     for verdict in llm_output.verdicts:
         pid = verdict.product_id
+        product = product_by_id.get(pid)
+
+        # Reject layering verdicts on fixed-form products
+        if product and product.category in _FIXED_FORM_CATEGORIES:
+            reason_lower = verdict.reason.lower()
+            if any(kw in reason_lower for kw in _LAYERING_KEYWORDS):
+                logger.debug(
+                    "Artist LLM guard: stripped layering verdict on fixed-form %s (%s)",
+                    product.category, product.name,
+                )
+                continue
+
         llm_resp = CompatibilityResponse(
             is_compatible=verdict.is_compatible,
             reason=verdict.reason,
@@ -364,11 +602,43 @@ async def run_artist_analysis(
         return ArtistOutput(results={})
 
     rule_findings = _run_rule_pass(products, beauty_profile)
+    # Add trace for artist rule hits
+    for pid, resp in rule_findings.items():
+        resp.debug_trace.append(f"ARTIST RULE: {resp.reason[:70]}")
+
+    # Physical interaction passes
+    powder_results, has_physical_failure = _run_powder_sandwich_pass(products)
+    glow_results = _run_glow_check(products)
+    under_eye_results = _run_under_eye_check(products, beauty_profile)
+
+    # Merge physical results into rule findings (higher severity wins)
+    combined = dict(rule_findings)
+    pass_labels = ["powder_sandwich", "glow_check", "under_eye"]
+    for label, physical in zip(pass_labels, [powder_results, glow_results, under_eye_results]):
+        for pid, resp in physical.items():
+            resp.debug_trace.append(f"ARTIST PHYSICAL ({label}): {resp.reason[:60]}")
+            if pid not in combined:
+                combined[pid] = resp
+            else:
+                existing = combined[pid]
+                if resp.severity == "error" and existing.severity == "warning":
+                    resp.debug_trace = existing.debug_trace + resp.debug_trace
+                    combined[pid] = resp
+                elif resp.severity == existing.severity:
+                    combined[pid] = existing.model_copy(update={
+                        "conflicting_product_ids": list(
+                            {*existing.conflicting_product_ids, *resp.conflicting_product_ids}
+                        ),
+                        "debug_trace": existing.debug_trace + resp.debug_trace,
+                    })
 
     try:
-        merged = await _run_llm_pass(products, beauty_profile, rule_findings)
+        merged = await _run_llm_pass(products, beauty_profile, combined)
     except QuotaExceededError:
-        # Return rule-based findings only; propagate quota flag upward
-        return ArtistOutput(results=rule_findings, quota_exceeded=True)
+        return ArtistOutput(
+            results=combined,
+            has_physical_failure=has_physical_failure,
+            quota_exceeded=True,
+        )
 
-    return ArtistOutput(results=merged)
+    return ArtistOutput(results=merged, has_physical_failure=has_physical_failure)
