@@ -84,7 +84,7 @@ export default function Navbar() {
 
       {/* Mobile nav */}
       {mobileOpen && (
-        <div className="absolute top-full left-0 w-full border-b border-border bg-background/95 backdrop-blur-lg px-6 py-8 md:hidden flex flex-col gap-6 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-full left-0 w-full rounded-b-2xl border-b border-border bg-background/95 backdrop-blur-lg px-6 py-8 md:hidden flex flex-col gap-6 animate-in fade-in slide-in-from-top-4 duration-300">
           {navLinks.map((link) => (
             <Link
               key={link.href}

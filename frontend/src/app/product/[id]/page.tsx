@@ -58,7 +58,7 @@ export default function ProductPage() {
   const walmartUrl = product.walmartUrl || walmartRetailer?.url;
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-12">
+    <div className="mx-auto max-w-6xl px-6 py-12">
       <Link
         href="/build"
         className="mb-10 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/40 transition-colors hover:text-accent font-sans"

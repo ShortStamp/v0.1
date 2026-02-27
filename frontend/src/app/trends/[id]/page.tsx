@@ -73,9 +73,11 @@ export default function TrendDetailPage() {
             <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Curated Products</h2>
             <span className="text-xs font-medium text-foreground/40 font-sans">{trend.products.length} Items</span>
           </div>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap justify-center gap-8">
             {trend.products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <div key={product.id} className="w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)]">
+                <ProductCard product={product} />
+              </div>
             ))}
           </div>
         </section>

@@ -87,7 +87,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16">
+    <div className="mx-auto max-w-4xl px-6 py-16">
       <div className="mb-12">
         <div className="mb-4 inline-block rounded-full bg-accent/10 px-4 py-1.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent font-sans">Account Dashboard</p>
@@ -99,7 +99,7 @@ export default function ProfilePage() {
       {beautyProfile ? (
         <section className="mb-12">
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-lg font-bold uppercase tracking-widest text-foreground/30 font-sans">Beauty Profile</h2>
+            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Beauty Profile</h2>
             <Link
               href="/quiz"
               className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-accent hover:text-pink-deep transition-colors font-sans"
@@ -132,7 +132,7 @@ export default function ProfilePage() {
         </section>
       ) : (
         <section className="mb-12">
-          <h2 className="mb-6 text-lg font-bold uppercase tracking-widest text-foreground/30 font-sans">Beauty Profile</h2>
+          <h2 className="mb-6 text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Beauty Profile</h2>
           <div className="rounded-3xl border border-dashed border-border/50 bg-white p-12 text-center shadow-xl shadow-accent/5">
             <p className="mb-8 text-sm text-foreground/60 font-sans leading-relaxed">
               Complete the beauty quiz to unlock personalized product recommendations and real-time compatibility checks.
@@ -149,7 +149,7 @@ export default function ProfilePage() {
 
       {/* Face upload */}
       <section className="mb-12">
-        <h2 className="mb-6 text-lg font-bold uppercase tracking-widest text-foreground/30 font-sans">Face Analysis</h2>
+        <h2 className="mb-6 text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Face Analysis</h2>
         <div className="group relative flex h-64 cursor-pointer flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed border-border/50 bg-white transition-all hover:border-accent hover:bg-accent/5 hover:shadow-xl hover:shadow-accent/5">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-foreground/20 transition-colors group-hover:bg-accent group-hover:text-white">
             <Upload className="h-8 w-8" />
@@ -165,8 +165,8 @@ export default function ProfilePage() {
 
       {/* Style preferences */}
       <section className="mb-12">
-        <h2 className="mb-6 text-lg font-bold uppercase tracking-widest text-foreground/30 font-sans">Aesthetic Interest</h2>
-        <div className="flex flex-wrap gap-3">
+        <h2 className="mb-6 text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Aesthetic Interest</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {styleOptions.map((style) => {
             const active = selectedStyles.includes(style);
             return (
@@ -188,7 +188,7 @@ export default function ProfilePage() {
 
       {/* Notifications */}
       <section className="mb-12">
-        <h2 className="mb-6 text-lg font-bold uppercase tracking-widest text-foreground/30 font-sans">Notifications</h2>
+        <h2 className="mb-6 text-sm font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Notifications</h2>
         <button
           onClick={() => setNotifications(!notifications)}
           className={`flex w-full items-center gap-6 rounded-3xl border px-8 py-6 transition-all duration-300 ${

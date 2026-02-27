@@ -24,9 +24,11 @@ export default function TrendsPage() {
         <FilterBar activeFilter={filter} onFilterChange={setFilter} />
       </div>
 
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="flex flex-wrap justify-center gap-8">
         {trends.map((trend) => (
-          <TrendCard key={trend.id} trend={trend} />
+          <div key={trend.id} className="w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)]">
+            <TrendCard trend={trend} />
+          </div>
         ))}
       </div>
 
