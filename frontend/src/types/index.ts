@@ -37,6 +37,14 @@ export interface CategoryDefinition {
   filters: ProductFilter[];
 }
 
+export interface ProductVariant {
+  shadeName?: string;
+  hexColor?: string;
+  imageUrl?: string;
+  price?: number;
+  isDefault?: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -50,6 +58,9 @@ export interface Product {
   reviews?: Review[];
   walmartUrl?: string;
   filters: Record<string, string | boolean | number>;
+  inciIngredients?: string[];
+  extraImageUrls?: string[];
+  variants?: ProductVariant[];
 }
 
 export interface RetailerPrice {

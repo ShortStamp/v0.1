@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from urllib.parse import parse_qs, unquote, urlparse
 
-from app.models.product import Brand, PriceHistory, Product, ProductFilterValue, ProductPrice, ProductReview, Retailer
+from app.models.product import Brand, PriceHistory, Product, ProductFilterValue, ProductPrice, ProductReview, ProductVariant, Retailer
 from app.schemas.product import (
     FilterPropertiesResponse,
     PaginatedProducts,
@@ -13,6 +13,7 @@ from app.schemas.product import (
     ProductListItem,
     RetailerPriceSchema,
     ReviewSchema,
+    VariantSchema,
 )
 from app.utils.exceptions import NotFoundError
 from app.utils.pagination import paginate
@@ -115,6 +116,18 @@ def _product_to_detail(product: Product) -> ProductDetail:
         ],
         filters={fv.filter_key: fv.value for fv in product.filter_values},
         walmart_url=_get_walmart_url(product),
+        inci_ingredients=product.inci_ingredients,
+        extra_image_urls=product.extra_image_urls,
+        variants=[
+            VariantSchema(
+                shade_name=v.shade_name,
+                hex_color=v.hex_color,
+                image_url=v.image_url,
+                price=v.price,
+                is_default=v.is_default,
+            )
+            for v in product.variants
+        ] if product.variants else None,
     )
 
 
@@ -312,6 +325,7 @@ async def get_product(db: AsyncSession, product_id: str) -> ProductDetail:
             selectinload(Product.prices).selectinload(ProductPrice.retailer),
             selectinload(Product.filter_values),
             selectinload(Product.reviews),
+            selectinload(Product.variants),
         )
     )
     product = result.scalar_one_or_none()

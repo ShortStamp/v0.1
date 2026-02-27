@@ -23,6 +23,14 @@ interface RawCategoryGroup {
   categories: RawCategory[];
 }
 
+interface RawVariant {
+  shade_name?: string;
+  hex_color?: string;
+  image_url?: string;
+  price?: number;
+  is_default?: boolean;
+}
+
 interface RawProduct {
   id: string;
   name: string;
@@ -36,6 +44,9 @@ interface RawProduct {
   reviews?: Array<{ author: string; rating: number; text: string }>;
   walmart_url?: string;
   filters?: Record<string, string>;
+  inci_ingredients?: string[];
+  extra_image_urls?: string[];
+  variants?: RawVariant[];
 }
 
 interface RawRetailerPrice {
@@ -481,6 +492,15 @@ function mapProduct(data: RawProduct): Product {
     reviews: data.reviews,
     walmartUrl: data.walmart_url,
     filters: data.filters || {},
+    inciIngredients: data.inci_ingredients ?? undefined,
+    extraImageUrls: data.extra_image_urls ?? undefined,
+    variants: data.variants?.map((v) => ({
+      shadeName: v.shade_name ?? undefined,
+      hexColor: v.hex_color ?? undefined,
+      imageUrl: v.image_url ?? undefined,
+      price: v.price ?? undefined,
+      isDefault: v.is_default ?? false,
+    })),
   };
 }
 

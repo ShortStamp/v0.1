@@ -32,11 +32,24 @@ class ProductListItem(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class VariantSchema(BaseModel):
+    shade_name: str | None = None
+    hex_color: str | None = None
+    image_url: str | None = None
+    price: float | None = None
+    is_default: bool = False
+
+    model_config = {"from_attributes": True}
+
+
 class ProductDetail(ProductListItem):
     description: str | None = None
     specs: list[str] | None = None
     reviews: list[ReviewSchema] = []
     walmart_url: str | None = None
+    inci_ingredients: list[str] | None = None
+    extra_image_urls: list[str] | None = None
+    variants: list[VariantSchema] | None = None
 
 
 class PaginatedProducts(BaseModel):

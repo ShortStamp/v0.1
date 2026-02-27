@@ -7,7 +7,8 @@ import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
 import { readBuildSlots, saveBuildSlot, saveBuildProductToCache, readBuildProductCache } from "@/lib/buildSlots";
 import { getQuizAutoFilters } from "@/lib/personalization";
-import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2, ExternalLink } from "lucide-react";
 import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 import { getProductColorInfo } from "@/lib/productColor";
 
@@ -465,8 +466,8 @@ export default function CategoryPage() {
                                     </div>
                                     <div className="space-y-1">
                                     <p className="text-[10px] font-bold uppercase tracking-widest text-accent font-sans">{getDisplayBrand(product.brand)}</p>
-                                    <p className="font-semibold text-foreground font-serif text-base">{getDisplayName(product.name)}</p>
-                                    
+                                    <Link href={`/product/${product.id}`} className="block font-semibold text-foreground font-serif text-base hover:text-accent transition-colors">{getDisplayName(product.name)}</Link>
+
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         {/* ChemAI compatibility badges */}
                                         {isCompatible && (
@@ -586,6 +587,13 @@ export default function CategoryPage() {
                             <div className="absolute bottom-2 right-2 rounded-full bg-white/80 px-2 py-1 text-[9px] font-bold text-foreground backdrop-blur-sm shadow-sm font-sans">
                                 <span className="flex items-center gap-1"><Star className="h-2.5 w-2.5 fill-accent text-accent" /> {product.stampScore}</span>
                             </div>
+                            <Link
+                              href={`/product/${product.id}`}
+                              className="absolute bottom-2 left-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-foreground/40 backdrop-blur-sm shadow-sm transition-all hover:bg-accent hover:text-white"
+                              title="View details"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
                           </div>
 
                           <div className="flex flex-1 flex-col gap-1 p-4">
@@ -593,9 +601,11 @@ export default function CategoryPage() {
                                 <p className="text-[9px] font-bold uppercase tracking-widest text-accent font-sans">
                                   {getDisplayBrand(product.brand)}
                                 </p>
-                                <h3 className="line-clamp-2 text-xs font-semibold leading-tight font-serif text-foreground">
-                                  {getDisplayName(product.name)}
-                                </h3>
+                                <Link href={`/product/${product.id}`} className="block">
+                                  <h3 className="line-clamp-2 text-xs font-semibold leading-tight font-serif text-foreground hover:text-accent transition-colors">
+                                    {getDisplayName(product.name)}
+                                  </h3>
+                                </Link>
                             </div>
                             
                             <div className="mt-auto pt-2 flex flex-col gap-2">

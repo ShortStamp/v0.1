@@ -158,17 +158,19 @@ export default function GroupPage() {
               {/* Icon / Product image */}
               {filled ? (
                 <div className="relative mb-4 h-32 w-full overflow-hidden rounded-2xl bg-gradient-to-br from-muted/50 to-pink-soft/10 p-4">
-                  <img
-                    // eslint-disable-next-line @next/next/no-img-element
-                    src={slot.product!.image || "/placeholder-product.jpg"}
-                    alt={getDisplayName(slot.product!.name)}
-                    className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-110"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.src = "/placeholder-product.jpg";
-                    }}
-                  />
-                  <div className="absolute right-2 top-2">
+                  <Link href={`/product/${slot.product!.id}`} className="block h-full w-full">
+                    <img
+                      // eslint-disable-next-line @next/next/no-img-element
+                      src={slot.product!.image || "/placeholder-product.jpg"}
+                      alt={getDisplayName(slot.product!.name)}
+                      className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-110"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src = "/placeholder-product.jpg";
+                      }}
+                    />
+                  </Link>
+                  <div className="absolute right-2 top-2 z-10">
                     <button
                         onClick={() => handleRemove(catKey)}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-foreground/40 backdrop-blur-sm transition-colors hover:bg-red-50 hover:text-red-500 shadow-sm"
@@ -192,8 +194,10 @@ export default function GroupPage() {
 
                 {filled ? (
                     <div className="w-full flex-1 flex flex-col items-center">
-                        <p className="line-clamp-1 text-[10px] font-bold uppercase tracking-widest text-accent font-sans">{getDisplayBrand(slot.product!.brand)}</p>
-                        <p className="mt-1 line-clamp-2 text-sm font-semibold leading-tight font-serif">{getDisplayName(slot.product!.name)}</p>
+                        <Link href={`/product/${slot.product!.id}`} className="text-center hover:opacity-70 transition-opacity">
+                          <p className="line-clamp-1 text-[10px] font-bold uppercase tracking-widest text-accent font-sans">{getDisplayBrand(slot.product!.brand)}</p>
+                          <p className="mt-1 line-clamp-2 text-sm font-semibold leading-tight font-serif">{getDisplayName(slot.product!.name)}</p>
+                        </Link>
 
                         {/* Chemist agent badges */}
                         {quotaExceeded ? (
