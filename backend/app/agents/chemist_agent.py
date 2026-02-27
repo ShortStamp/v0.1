@@ -14,7 +14,12 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.agents.base_agent import get_llm
-from app.schemas.compatibility import CompatibilityResponse, ProductSnapshot
+from app.schemas.compatibility import (
+    ApplicationStep,
+    BeautyProfileSnapshot,
+    CompatibilityResponse,
+    ProductSnapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +44,39 @@ def _is_quota_error(exc: Exception) -> bool:
             "TooManyRequests",
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Application-zone mapping for product categories.
+#
+# Layering conflicts (silicone/oil over water-based) only matter when two
+# products are applied to the SAME area of the face.  Mascara + blush, for
+# example, never physically layer, so silicone/water rules must not fire
+# across zones.
+# ---------------------------------------------------------------------------
+
+_CATEGORY_ZONE: dict[str, str] = {
+    # Face base + complexion
+    "foundation": "face", "concealer": "face", "primer": "face",
+    "powder": "face", "setting-spray": "face",
+    # Cheeks / contouring (still the face canvas)
+    "blush": "face", "bronzer": "face", "highlighter": "face", "contour": "face",
+    # Eye area
+    "eyeshadow": "eye", "eyeliner": "eye", "mascara": "eye", "false-lashes": "eye",
+    # Brow area
+    "brow-pencil": "brow", "brow-gel": "brow",
+    # Lip area
+    "lipstick": "lip", "lip-gloss": "lip", "lip-liner": "lip",
+}
+
+# Patterns whose conflicts are about physical LAYERING ORDER.
+# These should only fire when both products sit in the same application zone.
+# Active-ingredient conflicts (retinol, AHAs, etc.) are systemic — they fire
+# regardless of zone because skin absorbs them from any applied area.
+_LAYERING_PATTERNS: frozenset[str] = frozenset({
+    "dimethicone", "cyclopentasiloxane", "cyclomethicone",
+    "mineral oil", "isopropyl myristate",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +170,142 @@ KNOWN_CONFLICTS: list[tuple[str, str, str, str]] = [
 
 
 # ---------------------------------------------------------------------------
+# Skin-type safety rules
+# Each entry: (pattern, severity, reason)
+# Matched against top-15 INCI ingredients (lowercase substring).
+# ---------------------------------------------------------------------------
+
+SKIN_TYPE_RULES: dict[str, list[tuple[str, str, str]]] = {
+    "sensitive": [
+        ("glycolic acid",    "warning", "Glycolic acid (AHA) can cause redness and stinging on sensitive skin — patch test first."),
+        ("lactic acid",      "warning", "Lactic acid (AHA) may irritate sensitive skin."),
+        ("mandelic acid",    "warning", "Mandelic acid (AHA) can irritate sensitive skin."),
+        ("salicylic acid",   "warning", "Salicylic acid (BHA) can cause redness and flaking on sensitive skin."),
+        ("retinol",          "warning", "Retinol is a potent active that may be too irritating for sensitive skin."),
+        ("benzoyl peroxide", "error",   "Benzoyl peroxide commonly causes severe burning on sensitive skin."),
+        ("alcohol denat",    "warning", "Denatured alcohol strips the skin barrier — avoid on sensitive skin."),
+        ("sd alcohol",       "warning", "SD alcohol is drying and irritating for sensitive skin."),
+        ("fragrance",        "warning", "Fragrance is a leading contact allergen — high risk for sensitive skin."),
+        ("parfum",           "warning", "Parfum (fragrance) is a common irritant for sensitive skin."),
+    ],
+    "dry": [
+        ("alcohol denat",    "warning", "Denatured alcohol strips moisture — worsens dry skin."),
+        ("sd alcohol",       "warning", "SD alcohol has a drying effect that can aggravate dry skin."),
+        ("salicylic acid",   "warning", "Salicylic acid's keratolytic action can over-dry already dry skin."),
+    ],
+    "oily": [
+        ("mineral oil",         "warning", "Mineral oil is a heavy occlusive that can feel greasy and clog pores on oily skin."),
+        ("petrolatum",          "warning", "Petrolatum is highly occlusive — may cause congestion on oily skin."),
+        ("lanolin",             "warning", "Lanolin is a rich wax — may cause congestion on oily skin."),
+        ("isopropyl myristate", "warning", "Isopropyl myristate is comedogenic — avoid on oily/acne-prone skin."),
+        ("isopropyl palmitate", "warning", "Isopropyl palmitate has comedogenic potential — avoid on oily skin."),
+    ],
+}
+
+
+def _ingredient_position(pattern: str, inci_list: list[str]) -> int:
+    """Return 0-based index of the first INCI ingredient matching pattern, or 999."""
+    for i, ing in enumerate(inci_list):
+        if pattern in ing.lower():
+            return i
+    return 999
+
+
+def _run_skin_type_pass(
+    products: list[ProductSnapshot], skin_type: str | None
+) -> dict[str, CompatibilityResponse]:
+    """
+    Scan each product's top-15 INCI ingredients for skin-type-specific risks.
+    Returns per-product CompatibilityResponse with empty conflicting_product_ids.
+    One warning per product — highest severity wins among all matches.
+    """
+    if not skin_type or skin_type not in SKIN_TYPE_RULES:
+        return {}
+
+    rules = SKIN_TYPE_RULES[skin_type]
+    results: dict[str, CompatibilityResponse] = {}
+
+    for product in products:
+        top15 = [ing.lower() for ing in (product.inci_ingredients or [])[:15]]
+        best_severity: str | None = None
+        best_reason: str | None = None
+
+        for pattern, severity, reason in rules:
+            if any(pattern in ing for ing in top15):
+                # error beats warning
+                if best_severity is None or (severity == "error" and best_severity == "warning"):
+                    best_severity = severity
+                    best_reason = reason
+
+        if best_severity is not None:
+            results[product.id] = CompatibilityResponse(
+                is_compatible=False,
+                reason=best_reason,  # type: ignore[arg-type]
+                severity=best_severity,  # type: ignore[arg-type]
+                source_agent="chemist",
+                conflicting_product_ids=[],
+            )
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Formula type helper + application order builder
+# ---------------------------------------------------------------------------
+
+def _formula_type(product: ProductSnapshot) -> str:
+    """Classify a product's base formula from its top-5 INCI ingredients."""
+    top5 = [ing.lower() for ing in (product.inci_ingredients or [])[:5]]
+    water_markers = ("aqua", "water", "eau")
+    silicone_markers = ("dimethicone", "cyclopentasiloxane", "cyclomethicone", "trimethylsiloxysilicate")
+    if any(m in ing for ing in top5 for m in water_markers):
+        return "water"
+    if any(m in ing for ing in top5 for m in silicone_markers):
+        return "silicone"
+    return "other"
+
+
+_CATEGORY_STEP: dict[str, int] = {
+    "primer": 10, "concealer": 30, "foundation": 40, "powder": 70,
+    "blush": 80, "bronzer": 80, "contour": 80, "highlighter": 90,
+    "eyeshadow": 50, "eyeliner": 60, "mascara": 70,
+    "brow-pencil": 40, "brow-gel": 50,
+    "lip-liner": 40, "lipstick": 50, "lip-gloss": 60,
+    "setting-spray": 1000,
+}
+_FORMULA_OFFSET: dict[str, int] = {"water": 0, "other": 1, "silicone": 2}
+_FORMULA_NOTES: dict[str, str] = {
+    "water": "Apply first — water-based formula",
+    "silicone": "Apply after water-based products — silicone-based formula",
+}
+
+
+def _build_application_order(products: list[ProductSnapshot]) -> list[ApplicationStep]:
+    """
+    Return a deterministic step-by-step application order for the build.
+    Sorts by category step (setting-spray always last) then formula offset.
+    """
+    def _sort_key(p: ProductSnapshot) -> int:
+        base = _CATEGORY_STEP.get(p.category, 500)
+        offset = _FORMULA_OFFSET[_formula_type(p)]
+        return base + offset
+
+    sorted_products = sorted(products, key=_sort_key)
+
+    steps: list[ApplicationStep] = []
+    for idx, product in enumerate(sorted_products, start=1):
+        formula = _formula_type(product)
+        note = _FORMULA_NOTES.get(formula)
+        steps.append(ApplicationStep(
+            product_id=product.id,
+            product_name=product.name,
+            step=idx,
+            note=note,
+        ))
+    return steps
+
+
+# ---------------------------------------------------------------------------
 # LLM structured output schema
 # ---------------------------------------------------------------------------
 
@@ -192,6 +366,31 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                 if not ((a_has_a and b_has_b) or (a_has_b and b_has_a)):
                     continue
 
+                # Layering conflicts are only meaningful when both products are
+                # applied to the same area of the face.  Skip cross-zone pairs.
+                if pattern_a in _LAYERING_PATTERNS or pattern_b in _LAYERING_PATTERNS:
+                    zone_a = _CATEGORY_ZONE.get(prod_a.category, "unknown")
+                    zone_b = _CATEGORY_ZONE.get(prod_b.category, "unknown")
+                    if zone_a != zone_b:
+                        continue
+
+                # Concentration check — if both triggering patterns appear at
+                # position ≥ 15 in their respective INCI lists (trace level),
+                # downgrade error → warning and annotate the reason.
+                effective_severity = severity
+                effective_reason = reason
+                pos_a = min(
+                    _ingredient_position(pattern_a, prod_a.inci_ingredients),
+                    _ingredient_position(pattern_b, prod_a.inci_ingredients),
+                )
+                pos_b = min(
+                    _ingredient_position(pattern_a, prod_b.inci_ingredients),
+                    _ingredient_position(pattern_b, prod_b.inci_ingredients),
+                )
+                if severity == "error" and pos_a >= 15 and pos_b >= 15:
+                    effective_severity = "warning"
+                    effective_reason = reason + " (trace concentrations — lower risk)"
+
                 # Flag both products in the pair
                 for flagged_id, conflict_id in [
                     (prod_a.id, prod_b.id),
@@ -200,8 +399,8 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                     if flagged_id not in results:
                         results[flagged_id] = CompatibilityResponse(
                             is_compatible=False,
-                            reason=reason,
-                            severity=severity,  # type: ignore[arg-type]
+                            reason=effective_reason,
+                            severity=effective_severity,  # type: ignore[arg-type]
                             source_agent="chemist",
                             conflicting_product_ids=[conflict_id],
                         )
@@ -213,12 +412,12 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                         # Escalate severity if new conflict is worse
                         new_severity = (
                             "error"
-                            if severity == "error" or existing.severity == "error"
+                            if effective_severity == "error" or existing.severity == "error"
                             else "warning"
                         )
                         results[flagged_id] = CompatibilityResponse(
                             is_compatible=False,
-                            reason=existing.reason if existing.severity == new_severity else reason,
+                            reason=existing.reason if existing.severity == new_severity else effective_reason,
                             severity=new_severity,  # type: ignore[arg-type]
                             source_agent="chemist",
                             conflicting_product_ids=new_conflicting,
@@ -234,6 +433,7 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
 async def _run_llm_pass(
     products: list[ProductSnapshot],
     rule_findings: dict[str, CompatibilityResponse],
+    skin_type: str | None = None,
 ) -> dict[str, CompatibilityResponse]:
     """
     Call Gemini with structured output for nuanced gap-filling.
@@ -241,14 +441,16 @@ async def _run_llm_pass(
     """
     has_inci_data = any(p.inci_ingredients for p in products)
 
-    # Build the ingredient summary for each product
+    # Build the ingredient summary for each product (with positional index for LLM context)
     product_summaries = []
     for p in products:
         if p.inci_ingredients:
-            ing_text = ", ".join(p.inci_ingredients[:30])  # Cap at 30 for prompt length
+            indexed_ings = ", ".join(
+                f"{i + 1}. {ing}" for i, ing in enumerate(p.inci_ingredients[:30])
+            )
             data_quality = "INCI ingredient list available"
         else:
-            ing_text = ", ".join(p.specs or []) or "No ingredient data available"
+            indexed_ings = ", ".join(p.specs or []) or "No ingredient data available"
             data_quality = "No INCI data — specs/description only"
 
         product_summaries.append(
@@ -256,7 +458,7 @@ async def _run_llm_pass(
             f"Name: {p.name} by {p.brand}\n"
             f"Category: {p.category}\n"
             f"Data quality: {data_quality}\n"
-            f"Ingredients/specs: {ing_text}"
+            f"Ingredients/specs: {indexed_ings}"
         )
 
     # Summarize existing rule findings
@@ -276,6 +478,13 @@ async def _run_llm_pass(
              "If you cannot determine compatibility, note the limitation in your reason."
     )
 
+    skin_type_section = (
+        f"\nUSER SKIN TYPE: {skin_type}\n"
+        "Flag any additional skin-type-specific risks not already captured above "
+        "(e.g. heavy occlusives on oily skin, astringents on dry skin, irritants on sensitive skin)."
+        if skin_type else ""
+    )
+
     prompt = f"""You are a cosmetic chemist analyzing ingredient compatibility for a makeup build.
 
 PRODUCTS IN BUILD:
@@ -283,7 +492,7 @@ PRODUCTS IN BUILD:
 
 RULE-BASED FINDINGS (already detected):
 {rule_summary}
-{data_warning}
+{data_warning}{skin_type_section}
 
 TASK: Identify any additional formulation conflicts NOT already captured above.
 Focus on:
@@ -292,6 +501,9 @@ Focus on:
 - Oxidizing agents conflicting with antioxidants or retinoids
 - Oil-based vs water-based incompatibilities
 - Finish conflicts (e.g. high-shine gloss over matte foundation)
+
+Ingredient list positions are provided (1 = highest concentration). Ingredients at position ≥ 15
+are present at trace levels — note this context when assessing severity.
 
 Only flag genuine chemical/formulation conflicts. Do not flag stylistic preferences.
 If no additional conflicts exist beyond the rule findings, return an empty verdicts list.
@@ -352,12 +564,16 @@ If INCI data is missing, note "Limited analysis: no INCI data available" in the 
 # Public entry point
 # ---------------------------------------------------------------------------
 
-async def run_chemist_analysis(products: list[ProductSnapshot]) -> "ChemistOutput":
+async def run_chemist_analysis(
+    products: list[ProductSnapshot],
+    beauty_profile: BeautyProfileSnapshot | None = None,
+) -> "ChemistOutput":
     """
     Run the full Chemist Agent pipeline:
-    1. Rule pass against KNOWN_CONFLICTS.
-    2. LLM pass (Gemini) to fill gaps the rules miss.
-    3. Merge results (LLM can only raise severity).
+    1. Rule pass against KNOWN_CONFLICTS (with concentration downgrade).
+    2. Skin-type pass against SKIN_TYPE_RULES (if profile provided).
+    3. LLM pass (Gemini) to fill gaps the rules miss.
+    4. Build deterministic application order.
 
     Degrades gracefully when inci_ingredients is empty.
     """
@@ -366,15 +582,24 @@ async def run_chemist_analysis(products: list[ProductSnapshot]) -> "ChemistOutpu
     if not products:
         return ChemistOutput(results={})
 
+    skin_type = beauty_profile.skin_type if beauty_profile else None
+
     rule_findings = _run_rule_pass(products)
 
     if not rule_findings:
         logger.debug("No rule-based conflicts. Proceeding to LLM pass.")
 
-    try:
-        merged = await _run_llm_pass(products, rule_findings)
-    except QuotaExceededError:
-        # Return rule-based findings only; flag quota error for the frontend
-        return ChemistOutput(results=rule_findings, quota_exceeded=True)
+    # Skin-type pass — rule findings take precedence on conflict
+    skin_findings = _run_skin_type_pass(products, skin_type)
+    combined: dict[str, CompatibilityResponse] = {**skin_findings}
+    combined.update(rule_findings)
 
-    return ChemistOutput(results=merged)
+    try:
+        merged = await _run_llm_pass(products, combined, skin_type=skin_type)
+    except QuotaExceededError:
+        # Return deterministic findings only; flag quota error for the frontend
+        order = _build_application_order(products)
+        return ChemistOutput(results=combined, quota_exceeded=True, application_order=order)
+
+    order = _build_application_order(products)
+    return ChemistOutput(results=merged, application_order=order)

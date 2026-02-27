@@ -5,6 +5,10 @@ export function formatPrice(price?: number): string {
   return `$${price.toFixed(2)}`;
 }
 
+export function hasKnownPrice(p: RetailerPrice): boolean {
+  return typeof p.price === "number" && p.price > 0;
+}
+
 export function getBestOffer(prices: RetailerPrice[]): RetailerPrice | undefined {
   const inStock = prices.filter((p) => p.inStock);
   const pool = inStock.length > 0 ? inStock : prices;

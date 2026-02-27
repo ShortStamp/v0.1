@@ -92,7 +92,7 @@ interface RawBuild {
 }
 
 interface PaginatedProducts {
-  items: RawProduct[];
+  items: Product[];
   total: number;
   page: number;
   per_page: number;
@@ -338,10 +338,10 @@ class ApiClient {
     return data.map((t) => ({
       id: t.id,
       name: t.name,
-      image: t.image,
+      image: t.image ?? "",
       stampScore: t.stamp_score,
-      description: t.description,
-      direction: t.direction,
+      description: t.description ?? "",
+      direction: t.direction ?? "stable",
       products: [], // Products are fetched separately for a trend
       videos: t.videos || [],
       articles: t.articles || [],

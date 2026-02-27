@@ -117,7 +117,14 @@ async function adminFetch<T>(path: string, options: RequestInit = {}): Promise<T
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { detail?: string }).detail || `API error: ${res.status}`);
+    const detail = (body as { detail?: unknown }).detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+        ? detail.map((d: { msg?: string }) => d.msg ?? String(d)).join(", ")
+        : `API error: ${res.status}`;
+    throw new Error(message);
   }
 
   if (res.status === 204) return undefined as T;
@@ -133,6 +140,30 @@ function toQueryString(params: Record<string, string | number | boolean | undefi
   }
   const s = qs.toString();
   return s ? `?${s}` : "";
+}
+
+export interface IngestionStats {
+  missing_ingredients: number;
+  total_active: number;
+}
+
+export interface JobStatusResponse {
+  running: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+  total: number;
+  progress: {
+    queried: number;
+    updated: number;
+    not_found: number;
+    errors: number;
+  };
+  last_result: Record<string, number | string> | null;
+}
+
+export interface JobRunRequest {
+  limit?: number;
+  product_ids?: string[] | null;
 }
 
 // ---- Admin API client ----
@@ -180,4 +211,16 @@ export const adminApi = {
     adminFetch<void>(`/admin/products/${productId}/prices/${priceId}`, {
       method: "DELETE",
     }),
+
+  getIngestionStats: () =>
+    adminFetch<IngestionStats>("/admin/ingestion/stats"),
+
+  runIngredientAgent: (body: JobRunRequest = {}) =>
+    adminFetch<{ status: string; message?: string }>("/admin/ingestion/ingredient-agent/run", {
+      method: "POST",
+      body: JSON.stringify({ limit: 200, ...body }),
+    }),
+
+  getAgentStatus: () =>
+    adminFetch<JobStatusResponse>("/admin/ingestion/ingredient-agent/status"),
 };

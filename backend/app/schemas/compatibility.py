@@ -58,6 +58,7 @@ class OrchestratorOutput(BaseModel):
     build_id: str
     # Keyed by product_id. Only products with issues are included.
     compatibility_map: dict[str, CompatibilityResponse]
+    application_order: list["ApplicationStep"] = Field(default_factory=list)
     evaluated_at: datetime
     overall_compatibility_score: float = Field(
         ge=0.0, le=1.0,
@@ -129,6 +130,7 @@ class AgentState(BaseModel):
     chemist_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
     artist_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
     trend_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
+    application_order: list["ApplicationStep"] = Field(default_factory=list)
 
     # Final merged output — set by aggregate_node, read by API endpoint
     final_output: OrchestratorOutput | None = None
@@ -136,6 +138,17 @@ class AgentState(BaseModel):
     # Error tracking — Annotated with operator.add so parallel nodes can each append
     # without triggering LangGraph's INVALID_CONCURRENT_GRAPH_UPDATE error.
     errors: Annotated[list[str], operator.add] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Application order step — produced by Chemist Agent, forwarded to frontend
+# ---------------------------------------------------------------------------
+
+class ApplicationStep(BaseModel):
+    product_id: str
+    product_name: str
+    step: int           # 1-based apply order
+    note: str | None = None   # e.g. "Apply first — water-based formula"
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +178,7 @@ class ChemistOutput(BaseModel):
         default=False,
         description="True when the LLM call failed with a 429 quota/rate-limit error",
     )
+    application_order: list["ApplicationStep"] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +211,10 @@ class TrendInput(BaseModel):
 class TrendOutput(BaseModel):
     results: dict[str, CompatibilityResponse]
     trending_product_ids: list[str] = Field(default_factory=list)
+    quota_exceeded: bool = Field(
+        default=False,
+        description="True when the LLM call failed with a 429 quota/rate-limit error",
+    )
 
 
 # ---------------------------------------------------------------------------

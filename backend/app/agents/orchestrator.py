@@ -1,11 +1,8 @@
 """
 LangGraph orchestrator for the compatibility analysis pipeline.
 
-Phase 2 graph — Chemist + Artist Agents in parallel:
-  START → fetch_data → [chemist, artist] → aggregate → END
-
-Trend node is stubbed and will be wired in parallel in Phase 3:
-  fetch_data → [chemist, artist, trend] → aggregate
+Phase 3 graph — Chemist + Artist + Trend Agents in parallel:
+  START → fetch_data → [chemist, artist, trend] → aggregate → END
 """
 from __future__ import annotations
 
@@ -20,6 +17,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.artist_agent import run_artist_analysis
 from app.agents.chemist_agent import run_chemist_analysis
+from app.agents.trend_agent import run_trend_analysis
 from app.database import async_session
 from app.schemas.compatibility import (
     AgentState,
@@ -27,6 +25,7 @@ from app.schemas.compatibility import (
     OrchestratorInput,
     OrchestratorOutput,
     ProductSnapshot,
+    TrendSnapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,14 +37,16 @@ logger = logging.getLogger(__name__)
 
 async def fetch_data_node(state: AgentState) -> dict:
     """
-    Load ProductSnapshot list and BeautyProfileSnapshot from the DB.
+    Load ProductSnapshot list, BeautyProfileSnapshot, and active TrendSnapshots from the DB.
     Agents must not hit the DB directly — this node provides all data they need.
     """
     from app.models.product import Product, ProductFilterValue  # noqa: F401
+    from app.models.trend import Trend, TrendProduct
     from app.models.user import BeautyProfile
 
     products: list[ProductSnapshot] = []
     beauty_profile: BeautyProfileSnapshot | None = None
+    active_trends: list[TrendSnapshot] = []
 
     async with async_session() as db:
         # Load products with filter values (selectin avoids N+1)
@@ -93,17 +94,45 @@ async def fetch_data_node(state: AgentState) -> dict:
                     budget=getattr(bp, "budget", None),
                 )
 
-    return {"products": products, "beauty_profile": beauty_profile}
+        # Load all active trends with their associated product IDs (Trend Agent input)
+        trend_result = await db.execute(
+            select(Trend)
+            .where(Trend.is_active == True)  # noqa: E712
+            .options(selectinload(Trend.products))
+        )
+        trend_rows = trend_result.scalars().all()
+
+        # Only include trends that have at least one product in the current build
+        product_id_set = set(state.product_ids)
+        for t in trend_rows:
+            associated = [tp.product_id for tp in t.products]
+            # Include trend if any of its products are in the build
+            if any(pid in product_id_set for pid in associated):
+                active_trends.append(
+                    TrendSnapshot(
+                        id=t.id,
+                        name=t.name,
+                        description=t.description or "",
+                        direction=t.direction,  # type: ignore[arg-type]
+                        associated_product_ids=associated,
+                    )
+                )
+
+    return {"products": products, "beauty_profile": beauty_profile, "active_trends": active_trends}
 
 
 async def chemist_node(state: AgentState) -> dict:
     """Run INCI formulation conflict analysis."""
     try:
-        output = await run_chemist_analysis(state.products)
+        output = await run_chemist_analysis(state.products, state.beauty_profile)
         errors = list(state.errors)
         if output.quota_exceeded:
             errors.append("quota_exceeded")
-        return {"chemist_results": output.results, "errors": errors}
+        return {
+            "chemist_results": output.results,
+            "application_order": output.application_order,
+            "errors": errors,
+        }
     except Exception as exc:
         logger.error("Chemist agent failed: %s", exc)
         return {"errors": [*state.errors, f"chemist: {exc}"]}
@@ -122,17 +151,17 @@ async def artist_node(state: AgentState) -> dict:
         return {"errors": [*state.errors, f"artist: {exc}"]}
 
 
-# ---------------------------------------------------------------------------
-# Stub — Trend node plugs in here (Phase 3):
-#
-# async def trend_node(state: AgentState) -> dict:
-#     from app.agents.trend_agent import run_trend_analysis
-#     output = await run_trend_analysis(state.products, state.active_trends)
-#     errors = list(state.errors)
-#     if output.quota_exceeded:
-#         errors.append("quota_exceeded")
-#     return {"trend_results": output.results, "errors": errors}
-# ---------------------------------------------------------------------------
+async def trend_node(state: AgentState) -> dict:
+    """Run trend relevance analysis against active declining trends."""
+    try:
+        output = await run_trend_analysis(state.products, state.active_trends)
+        errors = list(state.errors)
+        if output.quota_exceeded:
+            errors.append("quota_exceeded")
+        return {"trend_results": output.results, "errors": errors}
+    except Exception as exc:
+        logger.error("Trend agent failed: %s", exc)
+        return {"errors": [*state.errors, f"trend: {exc}"]}
 
 
 async def aggregate_node(state: AgentState) -> dict:
@@ -168,6 +197,7 @@ async def aggregate_node(state: AgentState) -> dict:
     output = OrchestratorOutput(
         build_id=state.build_id,
         compatibility_map=compatibility_map,
+        application_order=state.application_order,
         evaluated_at=now,
         overall_compatibility_score=round(score, 4),
         errors=list(dict.fromkeys(state.errors)),  # deduplicate while preserving order
@@ -207,20 +237,18 @@ _builder = StateGraph(AgentState)
 _builder.add_node("fetch_data", fetch_data_node)
 _builder.add_node("chemist", chemist_node)
 _builder.add_node("artist", artist_node)
+_builder.add_node("trend", trend_node)
 _builder.add_node("aggregate", aggregate_node)
 
-# Phase 2 parallel graph:
-#   START → fetch_data → [chemist, artist] → aggregate → END
+# Phase 3 parallel graph:
+#   START → fetch_data → [chemist, artist, trend] → aggregate → END
 _builder.add_edge(START, "fetch_data")
 _builder.add_edge("fetch_data", "chemist")
 _builder.add_edge("fetch_data", "artist")
+_builder.add_edge("fetch_data", "trend")
 _builder.add_edge("chemist", "aggregate")
 _builder.add_edge("artist", "aggregate")
+_builder.add_edge("trend", "aggregate")
 _builder.add_edge("aggregate", END)
-
-# Phase 3: trend node wires in here alongside chemist and artist:
-# _builder.add_node("trend", trend_node)
-# _builder.add_edge("fetch_data", "trend")
-# _builder.add_edge("trend", "aggregate")
 
 compatibility_graph = _builder.compile()
