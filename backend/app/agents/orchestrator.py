@@ -208,22 +208,27 @@ async def aggregate_node(state: AgentState) -> dict:
         ",".join(sorted(state.product_ids)).encode()
     ).hexdigest()
 
-    # Persist each conflict verdict as a CompatibilityResult cache row
-    async with async_session() as db:
-        for product_id, compat in compatibility_map.items():
-            row = CompatibilityResult(
-                build_id=state.build_id,
-                product_id=product_id,
-                is_compatible=compat.is_compatible,
-                reason=compat.reason,
-                severity=compat.severity,
-                source_agent=compat.source_agent,
-                conflicting_product_ids=compat.conflicting_product_ids,
-                evaluated_at=now,
-                build_fingerprint=fingerprint,
-            )
-            db.add(row)
-        await db.commit()
+    # Persist each conflict verdict as a CompatibilityResult cache row.
+    # Wrapped in try/except so a DB failure (e.g. FK violation for
+    # "local-build") never prevents results from reaching the user.
+    try:
+        async with async_session() as db:
+            for product_id, compat in compatibility_map.items():
+                row = CompatibilityResult(
+                    build_id=state.build_id,
+                    product_id=product_id,
+                    is_compatible=compat.is_compatible,
+                    reason=compat.reason,
+                    severity=compat.severity,
+                    source_agent=compat.source_agent,
+                    conflicting_product_ids=compat.conflicting_product_ids,
+                    evaluated_at=now,
+                    build_fingerprint=fingerprint,
+                )
+                db.add(row)
+            await db.commit()
+    except Exception as exc:
+        logger.warning("Failed to cache compatibility results: %s", exc)
 
     return {"final_output": output}
 

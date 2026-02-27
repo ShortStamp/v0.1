@@ -19,9 +19,9 @@ class CompatibilityResult(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    # FK to builds.id — not enforced by SQLite but respected in PostgreSQL
-    build_id: Mapped[str] = mapped_column(
-        ForeignKey("builds.id"), index=True
+    # Plain string — no FK to builds.id so unauthenticated "local-build" IDs work
+    build_id: Mapped[str | None] = mapped_column(
+        String(100), index=True, nullable=True
     )
     product_id: Mapped[str] = mapped_column(
         ForeignKey("products.id"), index=True
