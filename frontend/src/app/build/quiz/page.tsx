@@ -401,13 +401,26 @@ export default function QuizPage() {
             )}
           </p>
 
-          {/* Skip */}
-          <button
-            onClick={handleSkip}
-            className="w-full py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 transition-colors hover:text-accent font-sans"
-          >
-            Skip for now
-          </button>
+          {/* Skip + Retake */}
+          <div className="flex items-center justify-center gap-6">
+            <button
+              onClick={handleSkip}
+              className="py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 transition-colors hover:text-accent font-sans"
+            >
+              Skip for now
+            </button>
+            <button
+              onClick={() => {
+                setDone(false);
+                setStep(0);
+                setAnswers({});
+                setSelected(null);
+              }}
+              className="py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 transition-colors hover:text-accent font-sans"
+            >
+              Retake Quiz
+            </button>
+          </div>
         </div>
       </div>
     );

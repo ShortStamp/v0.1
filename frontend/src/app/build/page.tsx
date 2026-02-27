@@ -72,12 +72,15 @@ export default function BuildPage() {
             <p className="max-w-md text-sm leading-relaxed text-foreground/60 font-sans">
               Curate your essentials across 5 key face areas. Our AI chemist will analyze compatibility in real-time.
             </p>
-            <Link
-              href="/build/quiz"
+            <button
+              onClick={() => {
+                localStorage.removeItem("beautyProfile");
+                router.push("/build/quiz");
+              }}
               className="text-[11px] font-bold uppercase tracking-[0.15em] text-accent transition-all hover:text-pink-deep font-sans"
             >
-              Edit Beauty Profile &rarr;
-            </Link>
+              Retake Quiz &rarr;
+            </button>
           </div>
         </div>
 
