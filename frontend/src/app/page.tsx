@@ -54,8 +54,8 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section className="border-y border-border bg-white/50 px-4 py-24 backdrop-blur-sm">
-        <div className="mx-auto max-w-5xl">
+      <section className="border-y border-border bg-white/50 px-6 py-24 backdrop-blur-sm">
+        <div className="mx-auto max-w-6xl">
           <h2 className="mb-16 text-center text-xs font-bold uppercase tracking-[0.3em] text-accent font-sans">
             The ShortStamp Experience
           </h2>
@@ -98,7 +98,7 @@ export default function Home() {
       </section>
 
       {/* Trending now */}
-      <section className="px-4 py-24">
+      <section className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <div className="mb-12 flex items-end justify-between">
             <div className="space-y-2">
@@ -112,9 +112,11 @@ export default function Home() {
               View all collections
             </Link>
           </div>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap justify-center gap-8">
             {trends.map((trend) => (
-              <TrendCard key={trend.id} trend={trend} />
+              <div key={trend.id} className="w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)]">
+                <TrendCard trend={trend} />
+              </div>
             ))}
           </div>
         </div>

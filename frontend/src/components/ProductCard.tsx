@@ -34,7 +34,7 @@ export default function ProductCard({ product, onSelect, selectable }: ProductCa
       <div className="flex flex-1 flex-col gap-2 p-5">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-accent font-sans">{displayBrand}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent font-sans">{displayBrand}</p>
             <h3 className="text-sm font-semibold leading-snug font-serif">{displayName}</h3>
           </div>
           <div className="group-hover:hidden">

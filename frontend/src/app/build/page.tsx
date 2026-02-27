@@ -26,13 +26,14 @@ const groupIcons: Record<string, LucideIcon> = {
 
 export default function BuildPage() {
   const router = useRouter();
-  const [filledSlots] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    return readBuildSlots();
-  });
+  const [hasMounted, setHasMounted] = useState(false);
+  const [filledSlots, setFilledSlots] = useState<Record<string, string>>({});
   const [isLoadingQuizRedirect, setIsLoadingQuizRedirect] = useState(false); // New state for quiz redirect loading
 
   useEffect(() => {
+    setHasMounted(true);
+    setFilledSlots(readBuildSlots());
+    
     const saved = localStorage.getItem("beautyProfile");
     if (!saved) {
       setIsLoadingQuizRedirect(true); // Indicate loading while redirecting
@@ -44,7 +45,7 @@ export default function BuildPage() {
   const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlots);
 
   const totalCategories = categoryGroups.reduce((sum, g) => sum + g.categories.length, 0);
-  const totalFilled = Object.keys(filledSlots).length;
+  const totalFilled = hasMounted ? Object.keys(filledSlots).length : 0;
 
   if (isLoadingQuizRedirect) {
     return (
@@ -106,7 +107,7 @@ export default function BuildPage() {
         </div>
 
         {/* Face area group tiles */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-wrap justify-center gap-6">
           {categoryGroups.map((group) => {
             const Icon = groupIcons[group.key] ?? Circle;
             const filled = group.categories.filter(
@@ -129,7 +130,7 @@ export default function BuildPage() {
               <Link
                 key={group.key}
                 href={`/build/${group.key}`}
-                className={`group flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-accent/10 ${
+                className={`group flex w-full flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-accent/10 sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] ${
                   isComplete
                     ? "border-accent bg-accent text-white shadow-xl shadow-accent/20"
                     : "border-border/50 bg-white hover:border-accent"

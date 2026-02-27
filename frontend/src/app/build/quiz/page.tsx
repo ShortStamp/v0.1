@@ -414,13 +414,7 @@ export default function QuizPage() {
   }
 
   // --- Quiz question screen ---
-  const optCount = question.options.length;
-  const gridCols =
-    optCount <= 3
-      ? "grid-cols-1 sm:grid-cols-3"
-      : optCount === 4
-        ? "grid-cols-2"
-        : "grid-cols-2 sm:grid-cols-3";
+  const gridCols = "grid-cols-2 sm:grid-cols-3";
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-background">
@@ -473,7 +467,7 @@ export default function QuizPage() {
                 key={opt.value}
                 onClick={() => advance(opt.value)}
                 disabled={selected !== null}
-                className={`group relative flex flex-col items-center justify-center gap-3 border px-4 py-5 text-center transition-all duration-200 ${
+                className={`group relative flex flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center transition-all duration-200 ${
                   isSelected
                     ? "border-accent bg-accent text-white shadow-lg shadow-accent/20"
                     : wasPreviouslyChosen

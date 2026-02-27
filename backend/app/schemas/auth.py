@@ -8,7 +8,7 @@ class SignupRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: str  # plain str so admin usernames (e.g. "admin") are accepted
+    email: str
     password: str
 
 

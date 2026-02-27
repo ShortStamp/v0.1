@@ -136,7 +136,7 @@ export default function GroupPage() {
       </div>
 
       {/* Category tiles */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+      <div className="flex flex-wrap justify-center gap-4">
         {group.categories.map((catKey) => {
           const slot = slotMap[catKey];
           const filled = slot?.product !== null;
@@ -145,7 +145,11 @@ export default function GroupPage() {
           return (
             <div
               key={catKey}
-              className={`group relative flex aspect-[3/5] flex-col items-center justify-between overflow-hidden rounded-3xl border p-4 text-center transition-all duration-300 hover:-translate-y-1 ${
+              className={`group relative flex aspect-[3/5] flex-col items-center justify-between overflow-hidden rounded-3xl border p-4 text-center transition-all duration-300 hover:-translate-y-1 w-[calc(50%-8px)] ${
+                group.categories.length <= 2
+                  ? "sm:w-[calc(50%-8px)]"
+                  : "sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)]"
+              } ${
                 filled
                   ? "border-accent/30 bg-white shadow-xl shadow-accent/10"
                   : "border-border/50 bg-white hover:border-accent hover:shadow-xl hover:shadow-accent/5"
