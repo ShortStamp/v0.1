@@ -74,6 +74,12 @@ class OrchestratorOutput(BaseModel):
     )
     # Agent-level error tags — e.g. "quota_exceeded" when Gemini returns 429
     errors: list[str] = Field(default_factory=list)
+    # Debug traces for compatible products (keyed by product_id).
+    # Incompatible products carry their traces in compatibility_map[pid].debug_trace.
+    all_traces: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Full decision traces for compatible products. Used by the frontend debug mode.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +152,10 @@ class AgentState(BaseModel):
     chemist_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
     artist_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
     trend_results: dict[str, CompatibilityResponse] = Field(default_factory=dict)
+    # Pass traces for compatible products from each agent (for debug mode)
+    chemist_pass_traces: dict[str, list[str]] = Field(default_factory=dict)
+    artist_pass_traces: dict[str, list[str]] = Field(default_factory=dict)
+    trend_pass_traces: dict[str, list[str]] = Field(default_factory=dict)
     application_order: list["ApplicationStep"] = Field(default_factory=list)
     has_physical_failure: bool = Field(
         default=False,
@@ -199,6 +209,10 @@ class ChemistOutput(BaseModel):
         description="True when the LLM call failed with a 429 quota/rate-limit error",
     )
     application_order: list["ApplicationStep"] = Field(default_factory=list)
+    pass_traces: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Debug traces for products that passed all chemist checks (keyed by product_id)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +234,10 @@ class ArtistOutput(BaseModel):
         default=False,
         description="True when the LLM call failed with a 429 quota/rate-limit error",
     )
+    pass_traces: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Debug traces for products that passed all artist checks (keyed by product_id)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -238,6 +256,10 @@ class TrendOutput(BaseModel):
     quota_exceeded: bool = Field(
         default=False,
         description="True when the LLM call failed with a 429 quota/rate-limit error",
+    )
+    pass_traces: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Debug traces for products that passed all trend checks (keyed by product_id)",
     )
 
 

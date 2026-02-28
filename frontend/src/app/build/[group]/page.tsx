@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import { formatPrice, getBestOfferForProduct, getDisplayBrand, getDisplayName } from "@/lib/pricing";
 import { useCompatibility } from "@/lib/useCompatibility";
+import { useDebugMode } from "@/lib/useDebugMode";
+import { PassBadge, DebugModeIndicator } from "@/components/DebugTrace";
 
 const categoryIcons: Record<CategoryKey, LucideIcon> = {
   foundation: Droplets,
@@ -88,7 +90,8 @@ export default function GroupPage() {
   const filledSlotsForCompat = Object.fromEntries(
     slots.filter((s) => s.product).map((s) => [s.category, s.product!.id])
   );
-  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlotsForCompat);
+  const { compatibilityMap, allTraces, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlotsForCompat);
+  const debugMode = useDebugMode();
 
   const handleRemove = (category: CategoryKey) => {
     removeBuildSlot(category);
@@ -119,6 +122,7 @@ export default function GroupPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
+      <DebugModeIndicator active={debugMode} />
       {/* Header */}
       <div className="mb-10 flex items-center gap-4">
         <button
@@ -214,6 +218,7 @@ export default function GroupPage() {
                                     compat={compat}
                                     resolveName={(id) => getDisplayName(slots.find((s) => s.product?.id === id)?.product?.name ?? "another product")}
                                     position="above"
+                                    debugMode={debugMode}
                                 />
                             </div>
                             );
@@ -226,10 +231,13 @@ export default function GroupPage() {
                             </p>
                         )}
 
-                        {/* Compatible badge */}
+                        {/* Compatible badge — always clickable to show per-agent pass traces */}
                         {!quotaExceeded && !isAnalyzing && analyzedIds.has(slot.product!.id) && !compatibilityMap[slot.product!.id] && (
-                            <div className="mt-3 rounded-full bg-green-50 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-green-600 border border-green-100 font-sans">
-                            ✓ Compatible
+                            <div className="mt-3">
+                              <PassBadge
+                                trace={allTraces[slot.product!.id] ?? []}
+                                position="above"
+                              />
                             </div>
                         )}
 

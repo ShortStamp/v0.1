@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.agents.base_agent import get_llm
 from app.schemas.compatibility import (
@@ -508,7 +508,9 @@ _NONPOLAR_MARKERS: tuple[str, ...] = (
     "isostearyl neopentanoate", "octyldodecanol",
 )
 
-_HYBRID_MARGIN = 0.4   # scores within this margin → hybrid classification
+_HYBRID_MARGIN = 0.4    # scores within this margin → candidate for hybrid
+_HYBRID_MAX_RATIO = 2.0 # if dominant phase is ≥ 2× the other, it's NOT a hybrid
+                        # regardless of the gap (e.g. polar=0.4 nonpolar=0.8 → silicone)
 
 
 class FormulaProfile:
@@ -532,7 +534,14 @@ class FormulaProfile:
         if self.polar_score == 0.0 and self.nonpolar_score == 0.0:
             self.base_type: Literal["water", "silicone", "hybrid", "other"] = "other"
         elif diff <= _HYBRID_MARGIN and self.polar_score > 0 and self.nonpolar_score > 0:
-            self.base_type = "hybrid"
+            # Gap is within hybrid range — but also check the ratio.
+            # If one phase is ≥ 2× the other the formula is phase-dominant, not a true
+            # W/Si emulsion bridge.  e.g. polar=0.4 nonpolar=0.8 → silicone, not hybrid.
+            ratio = max(self.nonpolar_score, self.polar_score) / min(self.nonpolar_score, self.polar_score)
+            if ratio >= _HYBRID_MAX_RATIO:
+                self.base_type = "silicone" if self.nonpolar_score > self.polar_score else "water"
+            else:
+                self.base_type = "hybrid"
         elif self.polar_score > self.nonpolar_score:
             self.base_type = "water"
         elif self.nonpolar_score > self.polar_score:
@@ -608,9 +617,14 @@ def _build_application_order(products: list[ProductSnapshot]) -> list[Applicatio
 class _ConflictVerdict(BaseModel):
     product_id: str
     is_compatible: bool
-    reason: str = Field(..., max_length=300)
+    reason: str
     severity: Literal["warning", "error"]
     conflicting_product_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def truncate_reason(cls, v: str) -> str:
+        return v[:300] if isinstance(v, str) else v
 
 
 class _ChemistLLMOutput(BaseModel):
@@ -627,13 +641,22 @@ class _ChemistLLMOutput(BaseModel):
 # Rule pass
 # ---------------------------------------------------------------------------
 
-def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityResponse]:
+def _run_rule_pass(
+    products: list[ProductSnapshot],
+) -> tuple[dict[str, CompatibilityResponse], set[frozenset[str]]]:
     """
     Iterate all product pairs against KNOWN_CONFLICTS.
-    Returns a dict of product_id → CompatibilityResponse for conflicting products only.
-    Each response includes a debug_trace showing every decision step.
+
+    Returns:
+        (results, killed_pairs)
+        - results      : product_id → CompatibilityResponse for flagged products only
+        - killed_pairs : frozenset pairs where the rule pass made a definitive decision
+                         (buffer-killed, hybrid-downgraded, or concentration-downgraded).
+                         The LLM pass must not resurrect layering conflicts for these pairs.
     """
     results: dict[str, CompatibilityResponse] = {}
+    # Pairs where the rule pass already issued a definitive verdict — LLM may not override.
+    killed_pairs: set[frozenset[str]] = set()
     # Per-product trace accumulator — collects lines even across multiple pair checks
     traces: dict[str, list[str]] = {}
 
@@ -706,6 +729,9 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                 effective_severity = severity
                 effective_reason = reason
 
+                # Pre-compute is_layering here so all downgrade/kill logic can reference it
+                is_layering = pattern_a in _LAYERING_PATTERNS or pattern_b in _LAYERING_PATTERNS
+
                 traces.setdefault(prod_a.id, []).append(
                     f"MATCH: {pattern_a}+{pattern_b} → initial severity={severity}"
                 )
@@ -728,9 +754,11 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                     msg = f"DOWNGRADE trace-conc: pos_a={pos_a} pos_b={pos_b} → warning"
                     traces[prod_a.id].append(msg)
                     traces[prod_b.id].append(msg)
+                    # Rule pass made a definitive call — LLM cannot re-escalate this layering pair
+                    if is_layering:
+                        killed_pairs.add(frozenset({prod_a.id, prod_b.id}))
 
                 # ── Hybrid de-escalation ──
-                is_layering = pattern_a in _LAYERING_PATTERNS or pattern_b in _LAYERING_PATTERNS
                 if effective_severity == "error" and is_layering:
                     if fp_a.is_hybrid or fp_b.is_hybrid:
                         effective_severity = "warning"
@@ -741,13 +769,20 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                             f"(polar {fp_h.polar_score}/non-polar {fp_h.nonpolar_score}) "
                             f"designed to bridge both base types — monitor but not critical."
                         )[:300]
+                        _gap_h = abs(fp_h.polar_score - fp_h.nonpolar_score)
+                        _ratio_h = (
+                            max(fp_h.nonpolar_score, fp_h.polar_score)
+                            / max(min(fp_h.nonpolar_score, fp_h.polar_score), 0.001)
+                        )
                         msg = (
                             f"DOWNGRADE hybrid: {hybrid_name[:30]} is hybrid "
                             f"(polar={fp_h.polar_score}, nonpolar={fp_h.nonpolar_score}, "
-                            f"gap={abs(fp_h.polar_score - fp_h.nonpolar_score):.1f}≤{_HYBRID_MARGIN}) → warning"
+                            f"gap={_gap_h:.2f}≤{_HYBRID_MARGIN}, ratio={_ratio_h:.1f}<{_HYBRID_MAX_RATIO}) → warning"
                         )
                         traces[prod_a.id].append(msg)
                         traces[prod_b.id].append(msg)
+                        # Rule pass made a definitive call — LLM cannot re-escalate this layering pair
+                        killed_pairs.add(frozenset({prod_a.id, prod_b.id}))
 
                 # ── Protective Buffer ──
                 if is_layering and effective_severity in ("error", "warning"):
@@ -769,6 +804,8 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                         )
                         traces[prod_a.id].append(msg)
                         traces[prod_b.id].append(msg)
+                        # Rule pass explicitly eliminated this conflict — LLM may not resurrect it
+                        killed_pairs.add(frozenset({prod_a.id, prod_b.id}))
                         continue  # skip this conflict entirely
 
                 # ── Final verdict trace ──
@@ -810,7 +847,7 @@ def _run_rule_pass(products: list[ProductSnapshot]) -> dict[str, CompatibilityRe
                             debug_trace=list(trace),
                         )
 
-    return results
+    return results, killed_pairs
 
 
 # ---------------------------------------------------------------------------
@@ -821,10 +858,15 @@ async def _run_llm_pass(
     products: list[ProductSnapshot],
     rule_findings: dict[str, CompatibilityResponse],
     skin_type: str | None = None,
+    killed_pairs: set[frozenset[str]] | None = None,
 ) -> dict[str, CompatibilityResponse]:
     """
     Call Gemini with structured output for nuanced gap-filling.
     Returns merged results where LLM can only raise severity, never lower it.
+
+    killed_pairs: frozenset pairs where the rule pass made a definitive decision
+    (buffer-killed, hybrid-downgraded, concentration-downgraded).  The LLM is
+    not permitted to add or escalate layering conflicts for these pairs.
     """
     has_inci_data = any(p.inci_ingredients for p in products)
 
@@ -910,6 +952,11 @@ CRITICAL EXCLUSIONS — do NOT flag these as conflicts:
   silicone-vs-water conflicts between liquid/cream products that must knit together
   on skin (primer, foundation, concealer, liquid blush, etc.).
 - Any "conflict" between products that never physically touch each other on the face.
+- LOCKED pairs (de-escalated or killed by the rule pass): if a product pair appears
+  in the RULE-BASED FINDINGS above with a "KILLED by buffer", "DOWNGRADE hybrid",
+  or "DOWNGRADE trace-conc" annotation, do NOT add a pilling/silicone/layering error
+  for that pair. The rule engine already made a definitive physics-based judgment.
+  You may flag entirely different categories of conflict (pH, actives, etc.) if warranted.
 
 Ingredient list positions are provided (1 = highest concentration). Ingredients at position ≥ 15
 are present at trace levels — note this context when assessing severity.
@@ -951,6 +998,15 @@ If INCI data is missing, note "Limited analysis: no INCI data available" in the 
 
     for verdict in llm_output.verdicts:
         pid = verdict.product_id
+
+        # ── Guard 0: reject hallucinated product IDs not in the build ──
+        if pid not in product_by_id:
+            logger.warning(
+                "Chemist LLM hallucinated unknown product ID %s — stripped",
+                pid[:8],
+            )
+            continue
+
         product = product_by_id.get(pid)
 
         # ── Post-LLM guard: reject layering verdicts on fixed-form products ──
@@ -988,6 +1044,32 @@ If INCI data is missing, note "Limited analysis: no INCI data available" in the 
                     if pid in merged:
                         merged[pid].debug_trace.append(
                             f"LLM STRIPPED: cross-zone guard blocked — {verdict.reason[:60]}"
+                        )
+                    continue
+
+        # ── Post-LLM guard: reject resurrection of rule-pass killed/de-escalated pairs ──
+        # The rule pass records pairs it explicitly killed (buffer) or de-escalated
+        # (hybrid formula, trace concentration).  The LLM must not add a new layering
+        # error for these pairs — it already overrode what the rules decided.
+        if killed_pairs and verdict.conflicting_product_ids:
+            reason_lower = verdict.reason.lower()
+            is_layering_reason = any(kw in reason_lower for kw in _LAYERING_KEYWORDS)
+            if is_layering_reason:
+                blocked_by = next(
+                    (
+                        cid for cid in verdict.conflicting_product_ids
+                        if frozenset({pid, cid}) in killed_pairs
+                    ),
+                    None,
+                )
+                if blocked_by is not None:
+                    logger.debug(
+                        "LLM guard: stripped resurrection of killed pair (%s↔%s): %s",
+                        pid[:8], blocked_by[:8], verdict.reason[:80],
+                    )
+                    if pid in merged:
+                        merged[pid].debug_trace.append(
+                            f"LLM STRIPPED: resurrection guard — rule pass already decided this pair ({verdict.reason[:50]})"
                         )
                     continue
 
@@ -1036,6 +1118,36 @@ If INCI data is missing, note "Limited analysis: no INCI data available" in the 
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
+def _build_pass_traces(
+    products: list[ProductSnapshot],
+    results: dict[str, CompatibilityResponse],
+    base_traces: dict[str, list[str]],
+    *,
+    quota_exceeded: bool = False,
+) -> dict[str, list[str]]:
+    """
+    Build debug traces for products that passed all chemist checks.
+    Each entry prepends the formula/INCI base trace, then appends a pass summary.
+    """
+    pass_traces: dict[str, list[str]] = {}
+    n_products = len(products)
+    for p in products:
+        if p.id in results:
+            continue
+        trace = list(base_traces.get(p.id, []))
+        pair_count = max(n_products - 1, 0)
+        if quota_exceeded:
+            trace.append(
+                f"CHEMIST PASS: {pair_count} product pair(s) checked (rule pass only — LLM quota exceeded) — no conflicts"
+            )
+        else:
+            trace.append(
+                f"CHEMIST PASS: {pair_count} product pair(s) checked (rule + LLM) — no conflicts detected"
+            )
+        pass_traces[p.id] = trace
+    return pass_traces
+
 
 def _build_base_traces(products: list[ProductSnapshot]) -> dict[str, list[str]]:
     """
@@ -1106,7 +1218,7 @@ async def run_chemist_analysis(
     # Pre-compute base traces for every product (formula profile + INCI top-5)
     base_traces = _build_base_traces(products)
 
-    rule_findings = _run_rule_pass(products)
+    rule_findings, killed_pairs = _run_rule_pass(products)
 
     if not rule_findings:
         logger.debug("No rule-based conflicts. Proceeding to LLM pass.")
@@ -1147,14 +1259,18 @@ async def run_chemist_analysis(
                     })
 
     try:
-        merged = await _run_llm_pass(products, combined, skin_type=skin_type)
+        merged = await _run_llm_pass(products, combined, skin_type=skin_type, killed_pairs=killed_pairs)
     except QuotaExceededError:
         order = _build_application_order(products)
         combined = _inject_base_traces(combined, base_traces)
-        return ChemistOutput(results=combined, quota_exceeded=True, application_order=order)
+        pass_traces = _build_pass_traces(products, combined, base_traces, quota_exceeded=True)
+        return ChemistOutput(results=combined, quota_exceeded=True, application_order=order, pass_traces=pass_traces)
 
     # Inject base formula traces into every final result
     merged = _inject_base_traces(merged, base_traces)
 
+    # Build pass traces for compatible products (used by frontend debug mode)
+    pass_traces = _build_pass_traces(products, merged, base_traces)
+
     order = _build_application_order(products)
-    return ChemistOutput(results=merged, application_order=order)
+    return ChemistOutput(results=merged, application_order=order, pass_traces=pass_traces)

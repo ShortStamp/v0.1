@@ -130,6 +130,7 @@ async def chemist_node(state: AgentState) -> dict:
             errors.append("quota_exceeded")
         return {
             "chemist_results": output.results,
+            "chemist_pass_traces": output.pass_traces,
             "application_order": output.application_order,
             "errors": errors,
         }
@@ -147,6 +148,7 @@ async def artist_node(state: AgentState) -> dict:
             errors.append("quota_exceeded")
         return {
             "artist_results": output.results,
+            "artist_pass_traces": output.pass_traces,
             "has_physical_failure": output.has_physical_failure,
             "errors": errors,
         }
@@ -162,7 +164,11 @@ async def trend_node(state: AgentState) -> dict:
         errors = list(state.errors)
         if output.quota_exceeded:
             errors.append("quota_exceeded")
-        return {"trend_results": output.results, "errors": errors}
+        return {
+            "trend_results": output.results,
+            "trend_pass_traces": output.pass_traces,
+            "errors": errors,
+        }
     except Exception as exc:
         logger.error("Trend agent failed: %s", exc)
         return {"errors": [*state.errors, f"trend: {exc}"]}
@@ -213,6 +219,18 @@ async def aggregate_node(state: AgentState) -> dict:
 
     now = datetime.now(timezone.utc)
 
+    # Build all_traces: merge pass traces for compatible products from all agents.
+    # Incompatible products already carry their conflict trace in compatibility_map[pid].debug_trace.
+    all_traces: dict[str, list[str]] = {}
+    for source_traces in (
+        state.chemist_pass_traces,
+        state.artist_pass_traces,
+        state.trend_pass_traces,
+    ):
+        for pid, trace in source_traces.items():
+            if pid not in compatibility_map:
+                all_traces.setdefault(pid, []).extend(trace)
+
     output = OrchestratorOutput(
         build_id=state.build_id,
         compatibility_map=compatibility_map,
@@ -221,6 +239,7 @@ async def aggregate_node(state: AgentState) -> dict:
         overall_compatibility_score=round(score, 4),
         has_physical_failure=has_physical_failure,
         errors=list(dict.fromkeys(state.errors)),  # deduplicate while preserving order
+        all_traces=all_traces,
     )
 
     # Compute fingerprint for cache keying

@@ -9,6 +9,8 @@ import type { CompatibilityMap } from "@/types";
  *
  * Returns:
  *  - compatibilityMap — products with detected conflicts (keyed by product ID)
+ *  - allTraces        — full decision traces for compatible products (keyed by product ID);
+ *                       populated by the backend when debug mode is active in the UI
  *  - analyzedIds      — set of product IDs included in the last completed analysis;
  *                       a product absent from compatibilityMap but present here is
  *                       confirmed compatible by the chemist agent
@@ -18,6 +20,7 @@ import type { CompatibilityMap } from "@/types";
  */
 export function useCompatibility(filledSlots: Record<string, string>) {
   const [compatibilityMap, setCompatibilityMap] = useState<CompatibilityMap>({});
+  const [allTraces, setAllTraces] = useState<Record<string, string[]>>({});
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
@@ -30,6 +33,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
 
     if (productIds.length < 2) {
       setCompatibilityMap({});
+      setAllTraces({});
       setAnalyzedIds(new Set());
       setQuotaExceeded(false);
       return;
@@ -76,7 +80,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
 
         const map: CompatibilityMap = {};
         for (const [productId, raw] of Object.entries(
-          (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: string; source_agent: string; conflicting_product_ids?: string[]; debug_trace?: string[] }>
+          (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: "warning" | "error"; source_agent: string; conflicting_product_ids?: string[]; debug_trace?: string[] }>
         )) {
           map[productId] = {
             isCompatible: raw.is_compatible,
@@ -88,6 +92,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
           };
         }
         setCompatibilityMap(map);
+        setAllTraces((data.all_traces ?? {}) as Record<string, string[]>);
         setAnalyzedIds(new Set(productIds));
 
         // Surface quota error signalled by the backend
@@ -98,6 +103,7 @@ export function useCompatibility(filledSlots: Record<string, string>) {
         // Silently degrade — no badge shown if backend is unreachable
         if (!cancelled) {
           setCompatibilityMap({});
+          setAllTraces({});
           setQuotaExceeded(false);
         }
       })
@@ -111,5 +117,5 @@ export function useCompatibility(filledSlots: Record<string, string>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [depKey]);
 
-  return { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded };
+  return { compatibilityMap, allTraces, analyzedIds, isAnalyzing, quotaExceeded };
 }

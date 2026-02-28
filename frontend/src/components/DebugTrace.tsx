@@ -5,6 +5,23 @@ import { createPortal } from "react-dom";
 import type { CompatibilityInfo } from "@/types";
 
 // ---------------------------------------------------------------------------
+// DebugModeIndicator — floating pill shown while debug mode is active
+// ---------------------------------------------------------------------------
+
+export function DebugModeIndicator({ active }: { active: boolean }) {
+  if (!active) return null;
+  return createPortal(
+    <div className="fixed bottom-4 right-4 z-[9998] flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 shadow-lg">
+      <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+      <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-white/70">
+        Debug · Shift+D
+      </span>
+    </div>,
+    document.body,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ConflictBadge — click-to-toggle panel with portal rendering.
 // The panel is portalled to document.body so it is never clipped by
 // overflow-hidden ancestors on tile cards.
@@ -14,9 +31,10 @@ interface ConflictBadgeProps {
   compat: CompatibilityInfo;
   resolveName: (id: string) => string;
   position?: "above" | "below";
+  debugMode?: boolean;
 }
 
-export function ConflictBadge({ compat, resolveName, position = "above" }: ConflictBadgeProps) {
+export function ConflictBadge({ compat, resolveName, position = "above", debugMode = false }: ConflictBadgeProps) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -116,7 +134,7 @@ export function ConflictBadge({ compat, resolveName, position = "above" }: Confl
           </p>
 
           {/* Debug trace */}
-          <DebugTrace trace={compat.debugTrace} />
+          <DebugTrace trace={compat.debugTrace} initialExpanded={debugMode} />
         </div>,
         document.body,
       )}
@@ -128,8 +146,8 @@ export function ConflictBadge({ compat, resolveName, position = "above" }: Confl
 // DebugTrace — collapsible trace panel (internal)
 // ---------------------------------------------------------------------------
 
-function DebugTrace({ trace }: { trace: string[] }) {
-  const [expanded, setExpanded] = useState(false);
+function DebugTrace({ trace, initialExpanded = false }: { trace: string[]; initialExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(initialExpanded);
 
   if (!trace || trace.length === 0) return null;
 
@@ -164,6 +182,7 @@ function DebugTrace({ trace }: { trace: string[] }) {
             else if (line.startsWith("PHYSICAL")) color = "text-indigo-500";
             else if (line.startsWith("ARTIST")) color = "text-pink-500";
             else if (line.startsWith("ORCHESTRATOR")) color = "text-violet-500";
+            else if (line.includes("PASS:")) color = "text-green-600";
 
             return (
               <p key={i} className={`font-mono text-[8px] leading-relaxed ${color}`}>
@@ -174,5 +193,103 @@ function DebugTrace({ trace }: { trace: string[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// PassBadge — shown for compatible products when debug mode is on
+// ---------------------------------------------------------------------------
+
+interface PassBadgeProps {
+  trace: string[];
+  position?: "above" | "below";
+}
+
+export function PassBadge({ trace, position = "above" }: PassBadgeProps) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  const reposition = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const panelWidth = 288;
+    let left = rect.left + rect.width / 2 - panelWidth / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
+    if (position === "above") {
+      setCoords({ top: rect.top + window.scrollY - 8, left });
+    } else {
+      setCoords({ top: rect.bottom + window.scrollY + 8, left });
+    }
+  }, [position]);
+
+  useEffect(() => {
+    if (!open) return;
+    reposition();
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [open, reposition]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const hasTrace = trace && trace.length > 0;
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
+        className="rounded-full bg-green-50 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-green-600 border border-green-100 font-sans hover:bg-green-100 transition-colors"
+      >
+        ✓ Compatible {hasTrace ? "▶" : ""}
+      </button>
+
+      {open && hasTrace && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[9999] w-72 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl"
+          style={{
+            top: coords.top,
+            left: coords.left,
+            transform: position === "above" ? "translateY(-100%)" : undefined,
+          }}
+        >
+          <p className="mb-2 text-[7px] font-bold uppercase tracking-widest text-foreground/25 font-sans">
+            All Agent Decisions
+          </p>
+          <div className="max-h-64 overflow-y-auto rounded-lg bg-foreground/[0.03] p-2">
+            {trace.map((line, i) => {
+              let color = "text-green-600";
+              if (line.startsWith("FORMULA:")) color = "text-blue-500";
+              else if (line.startsWith("INCI")) color = "text-foreground/40";
+              else if (line.startsWith("TREND PASS")) color = "text-teal-500";
+              else if (line.startsWith("ARTIST PASS")) color = "text-pink-500";
+              else if (line.startsWith("CHEMIST PASS")) color = "text-blue-500";
+              return (
+                <p key={i} className={`font-mono text-[8px] leading-relaxed ${color}`}>
+                  {line}
+                </p>
+              );
+            })}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
