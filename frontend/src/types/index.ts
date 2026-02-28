@@ -104,9 +104,16 @@ export interface BeautyProfile {
   concerns?: string[];
 }
 
+export interface CompatibilityReason {
+  agent: string;
+  text: string;
+  severity: "warning" | "error";
+}
+
 export interface CompatibilityInfo {
   isCompatible: boolean;
   reason: string;
+  reasons: CompatibilityReason[];
   severity: "warning" | "error";
   sourceAgent: string;
   conflictingProductIds: string[];

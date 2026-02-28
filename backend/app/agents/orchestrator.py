@@ -180,34 +180,75 @@ async def aggregate_node(state: AgentState) -> dict:
     build the final OrchestratorOutput.
     """
     from app.models.compatibility import CompatibilityResult
+    from app.schemas.compatibility import CompatibilityReason
 
-    # Merge results from all agents (trend is empty dict in Phase 2)
-    compatibility_map: dict = {}
-    compatibility_map.update(state.chemist_results)
-    # Artist results fill in products not already flagged by chemist;
-    # if both agents flag the same product, chemist (formulation conflict) wins
-    # UNLESS artist detected a physical texture error — those override chemist compatible.
-    for pid, resp in state.artist_results.items():
+    # Merge results from all agents
+    compatibility_map: dict[str, OrchestratorOutput.CompatibilityResponse] = {}
+
+    def merge_resp(pid: str, new_resp: OrchestratorOutput.CompatibilityResponse):
+        # Ensure new_resp has its own reason in its reasons list if not already there
+        if not new_resp.reasons:
+            new_resp.reasons = [CompatibilityReason(
+                agent=new_resp.source_agent,
+                text=new_resp.reason,
+                severity=new_resp.severity
+            )]
+
         if pid not in compatibility_map:
-            compatibility_map[pid] = resp
-        else:
-            existing = compatibility_map[pid]
-            is_artist_physical_error = (
-                resp.severity == "error"
-                and ("Texture Conflict" in resp.reason or "Powder Sandwich" in resp.reason)
-            )
-            if is_artist_physical_error:
-                # Merge traces from both agents
-                merged_trace = list(existing.debug_trace) + [
-                    f"ORCHESTRATOR: artist physical error overrides chemist ({existing.severity})"
-                ] + list(resp.debug_trace)
-                compatibility_map[pid] = resp.model_copy(update={"debug_trace": merged_trace})
-            elif resp.severity == "error" and existing.severity == "warning":
-                merged_trace = list(existing.debug_trace) + [
-                    f"ORCHESTRATOR: artist error escalates over chemist warning"
-                ] + list(resp.debug_trace)
-                compatibility_map[pid] = resp.model_copy(update={"debug_trace": merged_trace})
-    compatibility_map.update(state.trend_results)
+            compatibility_map[pid] = new_resp
+            return
+
+        existing = compatibility_map[pid]
+        
+        # Merge reasons
+        merged_reasons = list(existing.reasons)
+        for nr in new_resp.reasons:
+            if not any(r.text == nr.text for r in merged_reasons):
+                merged_reasons.append(nr)
+        
+        # Determine highest severity
+        final_severity = "error" if (existing.severity == "error" or new_resp.severity == "error") else "warning"
+        
+        # Chemist formulation conflicts usually take priority for the main 'reason' string (legacy support)
+        # unless artist physical error occurs.
+        is_artist_physical_error = (
+            new_resp.source_agent == "artist" 
+            and new_resp.severity == "error"
+            and ("Texture Conflict" in new_resp.reason or "Powder Sandwich" in new_resp.reason)
+        )
+
+        final_reason = existing.reason
+        final_source = existing.source_agent
+        
+        if is_artist_physical_error or (new_resp.severity == "error" and existing.severity == "warning"):
+            final_reason = new_resp.reason
+            final_source = new_resp.source_agent
+        elif existing.source_agent != "chemist" and new_resp.source_agent == "chemist":
+            final_reason = new_resp.reason
+            final_source = new_resp.source_agent
+
+        # Merge conflicting IDs
+        merged_conflicts = list(set(existing.conflicting_product_ids + new_resp.conflicting_product_ids))
+        
+        # Merge traces
+        merged_trace = list(existing.debug_trace) + [f"ORCHESTRATOR: Merged {new_resp.source_agent} results"] + list(new_resp.debug_trace)
+
+        compatibility_map[pid] = existing.model_copy(update={
+            "reason": final_reason,
+            "reasons": merged_reasons,
+            "severity": final_severity,
+            "source_agent": final_source,
+            "conflicting_product_ids": merged_conflicts,
+            "debug_trace": merged_trace
+        })
+
+    # Process each agent's results
+    for pid, resp in state.chemist_results.items():
+        merge_resp(pid, resp)
+    for pid, resp in state.artist_results.items():
+        merge_resp(pid, resp)
+    for pid, resp in state.trend_results.items():
+        merge_resp(pid, resp)
 
     # Compute overall score
     has_physical_failure = state.has_physical_failure
@@ -258,6 +299,7 @@ async def aggregate_node(state: AgentState) -> dict:
                     product_id=product_id,
                     is_compatible=compat.is_compatible,
                     reason=compat.reason,
+                    reasons=[r.model_dump() for r in (compat.reasons or [])],
                     severity=compat.severity,
                     source_agent=compat.source_agent,
                     conflicting_product_ids=compat.conflicting_product_ids,

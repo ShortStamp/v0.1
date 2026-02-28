@@ -85,8 +85,8 @@ def _run_rule_pass(
             results[product.id] = CompatibilityResponse(
                 is_compatible=True,
                 reason=(
-                    f"Associated with a declining trend ({names_str}). "
-                    "Consider more current alternatives."
+                    f"Trend note: This product is part of the {names_str} trend, "
+                    "which is fading. You might want to check out newer alternatives!"
                 ),
                 severity="warning",
                 source_agent="trend",

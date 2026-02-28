@@ -11,6 +11,13 @@ from pydantic import BaseModel, Field
 # Core output type — returned to the frontend
 # ---------------------------------------------------------------------------
 
+class CompatibilityReason(BaseModel):
+    """A single reason for a conflict or warning from a specific agent."""
+    agent: Literal["chemist", "artist", "trend", "orchestrator"]
+    text: str = Field(..., max_length=500)
+    severity: Literal["warning", "error"]
+
+
 class CompatibilityResponse(BaseModel):
     """
     The canonical compatibility verdict for a single product within a build.
@@ -19,8 +26,12 @@ class CompatibilityResponse(BaseModel):
     is_compatible: bool
     reason: str = Field(
         ...,
-        description="Human-readable explanation shown to the user",
-        max_length=300,
+        description="DEPRECATED: Primary human-readable explanation shown to the user. Use 'reasons' instead.",
+        max_length=500,
+    )
+    reasons: list[CompatibilityReason] = Field(
+        default_factory=list,
+        description="All human-readable explanations from different agents.",
     )
     severity: Literal["warning", "error"] = Field(
         ...,

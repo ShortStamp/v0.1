@@ -156,7 +156,7 @@ export default function ProductPage() {
               </a>
             )}
             <div className="flex gap-4">
-              <SaveProductButton productId={product.id} category={product.category} />
+              <SaveProductButton productId={product.id} category={product.category} product={product} />
               {walmartUrl && (
                 <a
                   href={walmartUrl}

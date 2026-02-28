@@ -3,15 +3,16 @@
 import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useState, useEffect } from "react";
-import { CategoryKey } from "@/types";
-import { readBuildSlots, saveBuildSlot } from "@/lib/buildSlots";
+import { CategoryKey, Product } from "@/types";
+import { readBuildSlots, saveBuildSlot, saveBuildProductToCache } from "@/lib/buildSlots";
 
 interface SaveProductButtonProps {
   productId: string;
-  category: CategoryKey;
+  category: string;
+  product?: Product; // Full product object for caching
 }
 
-export default function SaveProductButton({ productId, category }: SaveProductButtonProps) {
+export default function SaveProductButton({ productId, category, product }: SaveProductButtonProps) {
   const router = useRouter();
   const [saved, setSaved] = useState(false);
 
@@ -22,6 +23,9 @@ export default function SaveProductButton({ productId, category }: SaveProductBu
 
   const handleSave = () => {
     saveBuildSlot(category, productId);
+    if (product) {
+      saveBuildProductToCache(productId, product);
+    }
     setSaved(true);
   };
 

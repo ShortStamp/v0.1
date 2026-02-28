@@ -28,6 +28,7 @@ class CompatibilityResult(Base, TimestampMixin):
     )
     is_compatible: Mapped[bool]
     reason: Mapped[str] = mapped_column(Text)
+    reasons: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list)
     severity: Mapped[str] = mapped_column(String(10))   # 'warning' | 'error'
     source_agent: Mapped[str] = mapped_column(String(20))
     conflicting_product_ids: Mapped[list[str]] = mapped_column(JSON)

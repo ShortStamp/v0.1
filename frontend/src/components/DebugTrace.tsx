@@ -85,6 +85,19 @@ export function ConflictBadge({ compat, resolveName, position = "above", debugMo
 
   const isError = compat.severity === "error";
 
+  // Human-friendly mapping for source agents
+  const sourceLabels: Record<string, string> = {
+    chemist: "Ingredient Compatibility",
+    artist: "Makeup Artistry",
+    trend: "Trend Alignment",
+    orchestrator: "System Analysis",
+  };
+  const sourceLabel = sourceLabels[compat.sourceAgent] || "Expert Analysis";
+
+  const allReasons = compat.reasons && compat.reasons.length > 0 
+    ? compat.reasons 
+    : [{ agent: compat.sourceAgent, text: compat.reason, severity: compat.severity }];
+
   return (
     <>
       <button
@@ -109,32 +122,42 @@ export function ConflictBadge({ compat, resolveName, position = "above", debugMo
             transform: position === "above" ? "translateY(-100%)" : undefined,
           }}
         >
-          {/* Source agent tag */}
-          <p className="mb-2 text-[7px] font-bold uppercase tracking-widest text-foreground/25 font-sans">
-            Source: {compat.sourceAgent}
-          </p>
-
           {/* Conflicting products */}
           {compat.conflictingProductIds.length > 0 && (
-            <div className="mb-2 pb-2 border-b border-border/20">
-              <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">
+            <div className="mb-3 pb-3 border-b border-border/20">
+              <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">
                 Conflicts with
               </p>
-              {compat.conflictingProductIds.map((id) => (
-                <p key={id} className="text-[10px] font-bold text-foreground font-sans leading-snug">
-                  {resolveName(id)}
-                </p>
-              ))}
+              <div className="flex flex-col gap-1">
+                {compat.conflictingProductIds.map((id) => (
+                  <p key={id} className="text-[10px] font-bold text-foreground font-sans leading-snug">
+                    {resolveName(id)}
+                  </p>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Reason */}
-          <p className="text-[10px] font-medium leading-relaxed text-foreground font-sans">
-            {compat.reason}
-          </p>
+          {/* All Reasons / Agent Opinions */}
+          <div className="flex flex-col gap-4">
+            {allReasons.map((r, i) => (
+              <div key={i} className="space-y-1">
+                <p className={`text-[7px] font-bold uppercase tracking-widest font-sans ${
+                  r.severity === "error" ? "text-red-500" : "text-amber-600"
+                }`}>
+                  {sourceLabels[r.agent] || "Expert Analysis"}
+                </p>
+                <p className="text-[10px] font-medium leading-relaxed text-foreground font-sans">
+                  {r.text}
+                </p>
+              </div>
+            ))}
+          </div>
 
-          {/* Debug trace */}
-          <DebugTrace trace={compat.debugTrace} initialExpanded={debugMode} />
+          {/* Debug trace — only shown in Shift+D debug mode */}
+          {debugMode && (
+            <DebugTrace trace={compat.debugTrace} initialExpanded={true} />
+          )}
         </div>,
         document.body,
       )}
@@ -151,6 +174,24 @@ function DebugTrace({ trace, initialExpanded = false }: { trace: string[]; initi
 
   if (!trace || trace.length === 0) return null;
 
+  const humanizeLine = (line: string) => {
+    return line
+      .replace(/^FORMULA:/i, "🧪 Formula:")
+      .replace(/^INCI/i, "📋 Ingredients:")
+      .replace(/^MATCH:/i, "🔍 Match Found:")
+      .replace(/^SKIP/i, "⏩ Skipped:")
+      .replace(/^DOWNGRADE/i, "⚠️ Downgraded:")
+      .replace(/^KILLED/i, "✅ Resolved:")
+      .replace(/^VERDICT:/i, "🚩 Final Verdict:")
+      .replace(/^LLM ADDED/i, "🤖 AI Insight:")
+      .replace(/^LLM STRIPPED/i, "🤖 AI Refined:")
+      .replace(/^SKIN-TYPE/i, "🧴 Skin Type:")
+      .replace(/^PHYSICAL/i, "✨ Texture/Physical:")
+      .replace(/^ARTIST/i, "🎨 Artistry:")
+      .replace(/^ORCHESTRATOR/i, "⚙️ System:")
+      .replace(/PASS:/i, "✅ PASS:");
+  };
+
   return (
     <div className="mt-2 border-t border-border/20 pt-2">
       <button
@@ -163,7 +204,7 @@ function DebugTrace({ trace, initialExpanded = false }: { trace: string[]; initi
         >
           ▶
         </span>
-        Debug Trace ({trace.length})
+        System Analysis ({trace.length})
       </button>
       {expanded && (
         <div className="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-foreground/[0.03] p-2">
@@ -186,7 +227,7 @@ function DebugTrace({ trace, initialExpanded = false }: { trace: string[]; initi
 
             return (
               <p key={i} className={`font-mono text-[8px] leading-relaxed ${color}`}>
-                {line}
+                {humanizeLine(line)}
               </p>
             );
           })}
@@ -269,8 +310,8 @@ export function PassBadge({ trace, position = "above" }: PassBadgeProps) {
             transform: position === "above" ? "translateY(-100%)" : undefined,
           }}
         >
-          <p className="mb-2 text-[7px] font-bold uppercase tracking-widest text-foreground/25 font-sans">
-            All Agent Decisions
+          <p className="mb-2 text-[7px] font-bold uppercase tracking-widest text-foreground/40 font-sans">
+            Compatibility Analysis
           </p>
           <div className="max-h-64 overflow-y-auto rounded-lg bg-foreground/[0.03] p-2">
             {trace.map((line, i) => {
@@ -280,9 +321,18 @@ export function PassBadge({ trace, position = "above" }: PassBadgeProps) {
               else if (line.startsWith("TREND PASS")) color = "text-teal-500";
               else if (line.startsWith("ARTIST PASS")) color = "text-pink-500";
               else if (line.startsWith("CHEMIST PASS")) color = "text-blue-500";
+
+              // Reuse the humanize logic or just use a simpler one here
+              const humanLine = line
+                .replace(/^FORMULA:/i, "🧪 Formula:")
+                .replace(/^INCI/i, "📋 Ingredients:")
+                .replace(/^TREND PASS/i, "📈 Trend:")
+                .replace(/^ARTIST PASS/i, "🎨 Artistry:")
+                .replace(/^CHEMIST PASS/i, "🧪 Chemistry:");
+
               return (
                 <p key={i} className={`font-mono text-[8px] leading-relaxed ${color}`}>
-                  {line}
+                  {humanLine}
                 </p>
               );
             })}

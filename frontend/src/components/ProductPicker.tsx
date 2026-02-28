@@ -18,6 +18,13 @@ const PER_PAGE = 20;
 // Max candidates to include in the compatibility batch call
 const COMPAT_CANDIDATE_LIMIT = 20;
 
+const SOURCE_LABELS: Record<string, string> = {
+  chemist: "Ingredient Compatibility",
+  artist: "Makeup Artistry",
+  trend: "Trend Alignment",
+  orchestrator: "System Analysis",
+};
+
 interface ProductPickerProps {
   categoryKey: CategoryKey;
   onSelect: (product: Product) => void;
@@ -265,7 +272,29 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateIdsKey, categoryKey]);
 
-  const filtered = useMemo(() => products, [products]);
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      const compatA = compatibilityMap[a.id];
+      const compatB = compatibilityMap[b.id];
+
+      // Get "weight" for sorting: 0=Compatible, 1=Warning, 2=Error
+      const getWeight = (c?: any) => {
+        if (!c) return 0;
+        if (c.isCompatible) return 0;
+        return c.severity === "error" ? 2 : 1;
+      };
+
+      const weightA = getWeight(compatA);
+      const weightB = getWeight(compatB);
+
+      if (weightA !== weightB) return weightA - weightB;
+      
+      // Secondary sort: stamp score descending
+      return b.stampScore - a.stampScore;
+    });
+  }, [products, compatibilityMap]);
+
+  const filtered = sortedProducts;
 
   const displayedFilters = useMemo(() => {
     return category.filters.map((filter) => {
@@ -460,6 +489,10 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                                                     {isError ? "✕ Conflict" : "! Warning"}
                                                 </span>
                                                 <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
+                                                    {/* Source agent tag */}
+                                                    <p className="mb-2 text-[7px] font-bold uppercase tracking-widest text-foreground/40 font-sans">
+                                                        {SOURCE_LABELS[compat.sourceAgent] || "Expert Analysis"}
+                                                    </p>
                                                     {compat.conflictingProductIds.length > 0 && (
                                                         <div className="mb-2 pb-2 border-b border-border/20">
                                                             <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">Conflicts with</p>
@@ -540,6 +573,10 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
                                             {isError ? "✕ Conflict" : "! Warning"}
                                         </div>
                                         <div className="pointer-events-none absolute inset-x-0 top-full z-50 mt-2 w-56 rounded-2xl border border-border/50 bg-white p-4 shadow-2xl opacity-0 translate-y-1 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 group-hover/tooltip:scale-100">
+                                            {/* Source agent tag */}
+                                            <p className="mb-2 text-[7px] font-bold uppercase tracking-widest text-foreground/40 font-sans">
+                                                {SOURCE_LABELS[compat.sourceAgent] || "Expert Analysis"}
+                                            </p>
                                             {compat.conflictingProductIds.length > 0 && (
                                                 <div className="mb-2 pb-2 border-b border-border/20">
                                                     <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-foreground/40 font-sans">Conflicts with</p>

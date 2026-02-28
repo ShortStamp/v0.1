@@ -80,11 +80,16 @@ export function useCompatibility(filledSlots: Record<string, string>) {
 
         const map: CompatibilityMap = {};
         for (const [productId, raw] of Object.entries(
-          (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; severity: "warning" | "error"; source_agent: string; conflicting_product_ids?: string[]; debug_trace?: string[] }>
+          (data.compatibility_map ?? {}) as Record<string, { is_compatible: boolean; reason: string; reasons: any[]; severity: "warning" | "error"; source_agent: string; conflicting_product_ids?: string[]; debug_trace?: string[] }>
         )) {
           map[productId] = {
             isCompatible: raw.is_compatible,
             reason: raw.reason,
+            reasons: (raw.reasons ?? []).map(r => ({
+              agent: r.agent,
+              text: r.text,
+              severity: r.severity
+            })),
             severity: raw.severity,
             sourceAgent: raw.source_agent,
             conflictingProductIds: raw.conflicting_product_ids ?? [],

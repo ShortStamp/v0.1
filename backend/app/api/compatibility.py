@@ -148,6 +148,10 @@ async def _load_cache(
         compatibility_map[row.product_id] = CompatibilityResponse(
             is_compatible=row.is_compatible,
             reason=row.reason,
+            reasons=[
+                CompatibilityReason(**r) 
+                for r in (row.reasons or [])
+            ],
             severity=row.severity,  # type: ignore[arg-type]
             source_agent=row.source_agent,  # type: ignore[arg-type]
             conflicting_product_ids=row.conflicting_product_ids or [],

@@ -51,89 +51,89 @@ AESTHETIC_RULES: list[tuple[str, str, str, str, str, str]] = [
         "skin_type", "oily",
         "finish", "dewy",
         "warning",
-        "Dewy finishes amplify shine on oily skin; a matte or natural finish will control oiliness better.",
+        "Shine warning: Dewy products can look greasy on oily skin. A matte finish usually looks more polished for you.",
     ),
     (
         "skin_type", "oily",
         "finish", "luminous",
         "warning",
-        "Luminous finishes add shine; for oily skin a matte or satin finish provides better oil control.",
+        "Grease risk: Luminous finishes add extra shine, which might be too much for oily skin.",
     ),
     (
         "skin_type", "dry",
         "finish", "matte",
         "warning",
-        "Matte finishes can look dry and emphasize flakiness on dry skin; a dewy or satin finish is more flattering.",
+        "Drying note: Matte finishes can sometimes look flat or flaky on dry skin. Dewy or satin products usually feel better.",
     ),
     # --- Finish preference vs product finish ---
     (
         "finish", "matte",
         "finish", "dewy",
         "warning",
-        "This product's dewy finish conflicts with your matte finish preference.",
+        "Preference check: You prefer matte, but this product has a dewy (shiny) finish.",
     ),
     (
         "finish", "matte",
         "finish", "luminous",
         "warning",
-        "This product's luminous finish conflicts with your matte finish preference.",
+        "Preference mismatch: You like matte looks, but this product is designed to be luminous.",
     ),
     (
         "finish", "dewy",
         "finish", "matte",
         "warning",
-        "This product's matte finish conflicts with your preferred dewy finish.",
+        "Style mismatch: You prefer a dewy glow, but this product has a matte finish.",
     ),
     (
         "finish", "natural",
         "finish", "glitter",
         "warning",
-        "A glitter finish may be too bold for your natural finish preference.",
+        "Style note: This might be too bold since you usually prefer a natural look.",
     ),
     # --- Coverage preference vs product coverage ---
     (
         "coverage", "light",
         "coverage", "full",
         "warning",
-        "Full coverage exceeds your light coverage preference and may look heavy or cakey.",
+        "Preference check: This full-coverage product might look heavier than the light look you prefer.",
     ),
     (
         "coverage", "full",
         "coverage", "sheer",
         "warning",
-        "Sheer coverage won't meet your full coverage preference.",
+        "Preference mismatch: This might be too light since you usually prefer full coverage.",
     ),
     (
         "coverage", "full",
         "coverage", "light",
         "warning",
-        "Light coverage won't meet your full coverage preference.",
+        "Style note: This light-coverage product might not provide the full coverage you like.",
     ),
     # --- Skin type targeted formula vs user skin type ---
     (
         "skin_type", "dry",
         "skin_type", "oily",
         "warning",
-        "This formula targets oily skin and may be too mattifying or drying for your dry skin type.",
+        "Moisture mismatch: This is for oily skin and might feel too drying for your dry skin type.",
     ),
     (
         "skin_type", "oily",
         "skin_type", "dry",
         "warning",
-        "This formula targets dry skin and may feel too rich or heavy on oily skin.",
+        "Weight warning: This rich formula for dry skin might feel too heavy or greasy on oily skin.",
     ),
     # --- Undertone mismatches (warning level — escalated to error for foundation/concealer below) ---
     (
         "undertone", "cool",
         "undertone", "warm",
         "warning",
-        "This warm-toned formula may clash with your cool undertone; look for neutral or cool-toned shades.",
+        "Tone mismatch: This warm-toned shade might clash with your cool skin tone.",
     ),
     (
         "undertone", "warm",
         "undertone", "cool",
         "warning",
-        "This cool-toned formula may clash with your warm undertone; look for neutral or warm-toned shades.",
+        "Color clash: This cool-toned shade might not look quite right with your warm skin tone.",
     ),
 ]
 
@@ -270,10 +270,11 @@ def _compute_glow_score(product: ProductSnapshot) -> int:
 
 def _run_glow_check(
     products: list[ProductSnapshot],
+    profile: BeautyProfileSnapshot,
 ) -> dict[str, CompatibilityResponse]:
     """
     Sum glow scores for primer + foundation + highlighter.
-    If sum > 12 → flag all three with surface instability warning.
+    If sum > 12 (or > 10 for oily skin) → flag with visual stability warning.
     """
     results: dict[str, CompatibilityResponse] = {}
 
@@ -282,17 +283,29 @@ def _run_glow_check(
         return results
 
     total = sum(_compute_glow_score(p) for p in glow_products)
+    
+    skin_type = (profile.skin_type or "").lower()
+    threshold = 10 if skin_type == "oily" else 12
 
-    if total > 12:
+    if total > threshold:
         all_ids = [p.id for p in glow_products]
         for p in glow_products:
             others = [pid for pid in all_ids if pid != p.id]
+            msg = (
+                f"Visual Stability Risk: Your build has reached a 'Glow Overload' ({total}/15). "
+                "While each product is beautiful, stacking this much luminosity can make the skin "
+                "look oily rather than radiant, and may cause your base to slide by midday."
+            )
+            if skin_type == "oily":
+                msg = (
+                    f"Visual Stability Warning: Too many luminous products ({total}/15) for your "
+                    "oily skin type. This combination is likely to look greasy within hours and "
+                    "cause your makeup to break down. Choose one product to be your 'star' glow."
+                )
+
             results[p.id] = CompatibilityResponse(
                 is_compatible=False,
-                reason=(
-                    f"Surface Instability: cumulative glow score {total}/15 — "
-                    "excess luminosity causes grease migration and breakdown."
-                ),
+                reason=msg,
                 severity="warning",
                 source_agent="artist",
                 conflicting_product_ids=others,
@@ -398,9 +411,9 @@ def _run_visual_weight_check(
         results[p.id] = CompatibilityResponse(
             is_compatible=False,
             reason=(
-                f"Heavy Base Load: your base layer scores {total}/20 across "
-                f"{len(base_products)} products. Stacking multiple full-coverage formulas "
-                "creates a cakey, mask-like finish. Swap one product for a sheerer texture."
+                f"Texture Harmony Alert: This set of base products ({total}/20) is too heavy "
+                "for a natural finish. Stacking multiple full-coverage layers can create "
+                "a mask-like effect. Try swapping one for a more breathable, sheerer formula."
             )[:300],
             severity="warning",
             source_agent="artist",
@@ -907,7 +920,7 @@ async def run_artist_analysis(
 
     # Physical interaction passes
     powder_results, has_physical_failure = _run_powder_sandwich_pass(products)
-    glow_results = _run_glow_check(products)
+    glow_results = _run_glow_check(products, beauty_profile)
     under_eye_results = _run_under_eye_check(products, beauty_profile)
     visual_weight_results = _run_visual_weight_check(products)
     color_harmony_results = _run_color_harmony_check(products)

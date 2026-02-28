@@ -119,79 +119,79 @@ KNOWN_CONFLICTS: list[tuple[str, str, str, str]] = [
         "dimethicone",
         "aqua",
         "error",
-        "Silicone (dimethicone) applied over a water-based formula causes pilling and breaks down adhesion between layers.",
+        "Layering conflict: This silicone product won't stick well to your water-based layer. Expect it to 'roll off' or pill during the day.",
     ),
     (
         "cyclopentasiloxane",
         "aqua",
         "error",
-        "Silicone (cyclopentasiloxane) does not blend with water-based formulas — expect separation and uneven coverage.",
+        "Mixing issue: This silicone product doesn't blend with water-based formulas. Your makeup may look patchy or separated.",
     ),
     (
         "cyclomethicone",
         "aqua",
         "error",
-        "Silicone (cyclomethicone) repels water-based products, causing the layers to separate and pill.",
+        "Texture clash: Silicone and water don't mix here, which usually leads to the makeup 'balling up' (pilling) on your skin.",
     ),
     # AHA + retinol
     (
         "glycolic acid",
         "retinol",
         "error",
-        "Glycolic acid (AHA) combined with retinol causes excessive irritation and compromises the skin barrier.",
+        "Irritation risk: Combining Glycolic acid and retinol is too harsh for most skin. It can cause redness, stinging, or peeling.",
     ),
     (
         "lactic acid",
         "retinol",
         "error",
-        "Lactic acid (AHA) combined with retinol leads to over-exfoliation and heightened skin sensitivity.",
+        "Sensitivity warning: Using Lactic acid with retinol can over-exfoliate your skin, leaving it raw and sensitive.",
     ),
     (
         "mandelic acid",
         "retinol",
         "error",
-        "Mandelic acid (AHA) combined with retinol risks over-exfoliation and redness.",
+        "Harsh combination: Mandelic acid and retinol together can cause excessive redness and irritation.",
     ),
     # BHA + retinol
     (
         "salicylic acid",
         "retinol",
         "error",
-        "Salicylic acid (BHA) combined with retinol leads to over-exfoliation and skin barrier damage.",
+        "Barrier risk: Combining Salicylic acid and retinol can strip your skin's natural protection, leading to dryness and irritation.",
     ),
     # Benzoyl peroxide + retinol
     (
         "benzoyl peroxide",
         "retinol",
         "error",
-        "Benzoyl peroxide oxidizes retinol on contact, deactivating it and reducing efficacy.",
+        "Efficacy issue: Benzoyl peroxide can cancel out your retinol, making both products less effective.",
     ),
     # Vitamin C + retinol
     (
         "ascorbic acid",
         "retinol",
         "warning",
-        "Vitamin C (ascorbic acid) and retinol can destabilize each other at high concentrations; consider using at different times.",
+        "Potency note: Vitamin C and retinol can be tricky together. For best results, use one in the morning and the other at night.",
     ),
     # Niacinamide + high-concentration Vitamin C
     (
         "niacinamide",
         "ascorbic acid",
         "warning",
-        "High-concentration niacinamide can reduce vitamin C (ascorbic acid) efficacy; use in separate steps.",
+        "Efficacy note: High-strength Niacinamide can sometimes make Vitamin C less effective. Try using them at different times.",
     ),
     # Oil-based over water-based
     (
         "mineral oil",
         "aqua",
         "warning",
-        "Oil-based products (mineral oil) applied over water-based formulas can cause pilling and uneven wear.",
+        "Wear issue: This oil-based product may not sit right over water-based formulas, possibly causing pilling or uneven wear.",
     ),
     (
         "isopropyl myristate",
         "aqua",
         "warning",
-        "Oil-ester formulas (isopropyl myristate) over water-based products may cause separation and reduce longevity.",
+        "Longevity note: Oil-rich products over water can slide around or separate, making your makeup last for less time.",
     ),
 ]
 
@@ -204,28 +204,28 @@ KNOWN_CONFLICTS: list[tuple[str, str, str, str]] = [
 
 SKIN_TYPE_RULES: dict[str, list[tuple[str, str, str]]] = {
     "sensitive": [
-        ("glycolic acid",    "warning", "Glycolic acid (AHA) can cause redness and stinging on sensitive skin — patch test first."),
-        ("lactic acid",      "warning", "Lactic acid (AHA) may irritate sensitive skin."),
-        ("mandelic acid",    "warning", "Mandelic acid (AHA) can irritate sensitive skin."),
-        ("salicylic acid",   "warning", "Salicylic acid (BHA) can cause redness and flaking on sensitive skin."),
-        ("retinol",          "warning", "Retinol is a potent active that may be too irritating for sensitive skin."),
-        ("benzoyl peroxide", "error",   "Benzoyl peroxide commonly causes severe burning on sensitive skin."),
-        ("alcohol denat",    "warning", "Denatured alcohol strips the skin barrier — avoid on sensitive skin."),
-        ("sd alcohol",       "warning", "SD alcohol is drying and irritating for sensitive skin."),
-        ("fragrance",        "warning", "Fragrance is a leading contact allergen — high risk for sensitive skin."),
-        ("parfum",           "warning", "Parfum (fragrance) is a common irritant for sensitive skin."),
+        ("glycolic acid",    "warning", "Redness risk: Glycolic acid (AHA) might cause stinging on sensitive skin — patch test first!"),
+        ("lactic acid",      "warning", "Irritation risk: Lactic acid (AHA) can be slightly harsh for sensitive skin."),
+        ("mandelic acid",    "warning", "Sensitivity note: Mandelic acid (AHA) may still irritate very sensitive skin types."),
+        ("salicylic acid",   "warning", "Flakiness risk: Salicylic acid (BHA) can lead to redness and dry patches on sensitive skin."),
+        ("retinol",          "warning", "Sensitivity warning: Retinol is powerful and can easily irritate sensitive skin."),
+        ("benzoyl peroxide", "error",   "Burning risk: Benzoyl peroxide is often too aggressive for sensitive skin, causing stinging."),
+        ("alcohol denat",    "warning", "Drying note: Denatured alcohol is very harsh and can strip sensitive skin."),
+        ("sd alcohol",       "warning", "Irritation risk: SD alcohol is very drying for sensitive skin."),
+        ("fragrance",        "warning", "Allergy note: Fragrance often causes issues for sensitive skin."),
+        ("parfum",           "warning", "Allergy note: Added scents can irritate sensitive skin types."),
     ],
     "dry": [
-        ("alcohol denat",    "warning", "Denatured alcohol strips moisture — worsens dry skin."),
-        ("sd alcohol",       "warning", "SD alcohol has a drying effect that can aggravate dry skin."),
-        ("salicylic acid",   "warning", "Salicylic acid's keratolytic action can over-dry already dry skin."),
+        ("alcohol denat",    "warning", "Extra drying: Denatured alcohol strips away moisture, making dry skin worse."),
+        ("sd alcohol",       "warning", "Moisture loss: SD alcohol can leave dry skin feeling tight and flaky."),
+        ("salicylic acid",   "warning", "Dryness warning: Salicylic acid can over-dry already parched skin."),
     ],
     "oily": [
-        ("mineral oil",         "warning", "Mineral oil is a heavy occlusive that can feel greasy and clog pores on oily skin."),
-        ("petrolatum",          "warning", "Petrolatum is highly occlusive — may cause congestion on oily skin."),
-        ("lanolin",             "warning", "Lanolin is a rich wax — may cause congestion on oily skin."),
-        ("isopropyl myristate", "warning", "Isopropyl myristate is comedogenic — avoid on oily/acne-prone skin."),
-        ("isopropyl palmitate", "warning", "Isopropyl palmitate has comedogenic potential — avoid on oily skin."),
+        ("mineral oil",         "warning", "Clog risk: Heavy oils can feel greasy and block pores on oily skin."),
+        ("petrolatum",          "warning", "Grease note: Petrolatum is very heavy and might lead to breakouts on oily skin."),
+        ("lanolin",             "warning", "Clog risk: This rich wax might be too heavy for oily or acne-prone skin."),
+        ("isopropyl myristate", "warning", "Breakout risk: This ingredient is known to clog pores on oily skin."),
+        ("isopropyl palmitate", "warning", "Pore warning: This can be a heavy ingredient that triggers oily skin issues."),
     ],
 }
 
