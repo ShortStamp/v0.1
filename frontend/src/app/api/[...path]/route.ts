@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Allow up to 60 s — covers Render free-tier cold starts (~30 s)
+export const maxDuration = 60;
+
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 async function proxy(req: NextRequest): Promise<NextResponse> {

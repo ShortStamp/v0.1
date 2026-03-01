@@ -28,6 +28,7 @@ export default function CategoryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filterOptionsByKey, setFilterOptionsByKey] = useState<Record<string, string[]>>({});
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
@@ -83,6 +84,7 @@ export default function CategoryPage() {
     setPage(1);
     setProducts([]);
     setHasMore(true);
+    setLoadError(false);
   }, [categoryKey, search, activeFilters]);
 
   // Fetch products — appends on page > 1, replaces on page === 1
@@ -135,7 +137,10 @@ export default function CategoryPage() {
         }
         setHasMore(data.items.length === PER_PAGE);
       } catch {
-        if (!cancelled && isFirstPage) setProducts([]);
+        if (!cancelled && isFirstPage) {
+          setProducts([]);
+          setLoadError(true);
+        }
       } finally {
         if (!cancelled) {
           if (isFirstPage) setLoading(false);
@@ -429,6 +434,22 @@ export default function CategoryPage() {
             <div className="flex flex-col items-center justify-center py-32">
               <Loader2 className="h-8 w-8 animate-spin text-foreground/30" />
               <p className="mt-4 text-sm text-foreground/40">Loading products...</p>
+              <p className="mt-2 text-[10px] text-foreground/20 font-sans">First load may take a moment</p>
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center py-32 gap-6">
+              <p className="text-sm text-foreground/50 font-sans">Couldn&apos;t reach the server. It may be warming up.</p>
+              <button
+                onClick={() => {
+                  setLoadError(false);
+                  setPage(1);
+                  setProducts([]);
+                  setHasMore(true);
+                }}
+                className="rounded-xl bg-foreground px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white transition-colors hover:bg-accent font-sans"
+              >
+                Try Again
+              </button>
             </div>
           ) : (
             <>
