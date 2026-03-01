@@ -24,6 +24,8 @@ export function useCompatibility(filledSlots: Record<string, string>) {
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [recipeCard, setRecipeCard] = useState<any | null>(null);
+  const [overallScore, setOverallScore] = useState<number>(1.0);
 
   // Stable dep key: sorted product IDs joined — avoids re-runs on reference changes
   const depKey = Object.values(filledSlots).filter(Boolean).sort().join(",");
@@ -36,6 +38,8 @@ export function useCompatibility(filledSlots: Record<string, string>) {
       setAllTraces({});
       setAnalyzedIds(new Set());
       setQuotaExceeded(false);
+      setRecipeCard(null);
+      setOverallScore(1.0);
       return;
     }
 
@@ -99,6 +103,8 @@ export function useCompatibility(filledSlots: Record<string, string>) {
         setCompatibilityMap(map);
         setAllTraces((data.all_traces ?? {}) as Record<string, string[]>);
         setAnalyzedIds(new Set(productIds));
+        setRecipeCard(data.recipe_card ?? null);
+        setOverallScore(data.overall_compatibility_score ?? 1.0);
 
         // Surface quota error signalled by the backend
         const errors: string[] = data.errors ?? [];
@@ -110,6 +116,8 @@ export function useCompatibility(filledSlots: Record<string, string>) {
           setCompatibilityMap({});
           setAllTraces({});
           setQuotaExceeded(false);
+          setRecipeCard(null);
+          setOverallScore(1.0);
         }
       })
       .finally(() => {
@@ -122,5 +130,5 @@ export function useCompatibility(filledSlots: Record<string, string>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [depKey]);
 
-  return { compatibilityMap, allTraces, analyzedIds, isAnalyzing, quotaExceeded };
+  return { compatibilityMap, allTraces, analyzedIds, isAnalyzing, quotaExceeded, recipeCard, overallScore };
 }

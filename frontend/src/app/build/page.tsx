@@ -6,6 +6,7 @@ import Link from "next/link";
 import { categoryGroups } from "@/lib/data";
 import { readBuildSlots } from "@/lib/buildSlots";
 import { useCompatibility } from "@/lib/useCompatibility";
+import { MakeupRecipeCard } from "@/components/MakeupRecipeCard";
 import {
   Droplets,
   Eye,
@@ -28,7 +29,8 @@ export default function BuildPage() {
   const router = useRouter();
   const [hasMounted, setHasMounted] = useState(false);
   const [filledSlots, setFilledSlots] = useState<Record<string, string>>({});
-  const [isLoadingQuizRedirect, setIsLoadingQuizRedirect] = useState(false); // New state for quiz redirect loading
+  const [isLoadingQuizRedirect, setIsLoadingQuizRedirect] = useState(false);
+  const [showAllGroups, setShowAllGroups] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -36,13 +38,20 @@ export default function BuildPage() {
     
     const saved = localStorage.getItem("beautyProfile");
     if (!saved) {
-      setIsLoadingQuizRedirect(true); // Indicate loading while redirecting
+      setIsLoadingQuizRedirect(true);
       router.push("/build/quiz");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded } = useCompatibility(filledSlots);
+  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded, recipeCard, overallScore } = useCompatibility(filledSlots);
+
+  // Core Face progress: Focus on the "Base" group categories
+  const baseGroup = categoryGroups.find(g => g.key === "base");
+  const coreCategories = baseGroup ? baseGroup.categories : [];
+  const coreFilled = coreCategories.filter(cat => filledSlots[cat]).length;
+  const coreTotal = coreCategories.length;
+  const coreProgress = Math.round(coreTotal > 0 ? (coreFilled / coreTotal) * 100 : 0);
 
   const totalCategories = categoryGroups.reduce((sum, g) => sum + g.categories.length, 0);
   const totalFilled = hasMounted ? Object.keys(filledSlots).length : 0;
@@ -55,6 +64,8 @@ export default function BuildPage() {
     );
   }
 
+  const displayedGroups = showAllGroups ? categoryGroups : categoryGroups.filter(g => g.key === "base");
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-6 py-16">
@@ -62,15 +73,15 @@ export default function BuildPage() {
         <div className="mb-12">
           <div className="mb-4 inline-block rounded-full bg-accent/10 px-4 py-1.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent font-sans">
-              Personalized Toolbox
+              Validation Engine
             </p>
           </div>
           <h1 className="mb-4 text-4xl font-bold font-serif">
-            Build Your Look
+            Set Compatibility Engine
           </h1>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-md text-sm leading-relaxed text-foreground/60 font-sans">
-              Curate your essentials across 5 key face areas. Our AI chemist will analyze compatibility in real-time.
+              Input your kit. Detect pilling. Perfect your finish. Our AI agents analyze mechanical and chemical stability in real-time.
             </p>
             <button
               onClick={() => {
@@ -84,34 +95,39 @@ export default function BuildPage() {
           </div>
         </div>
 
-        {/* Overall progress */}
+        {/* Core Face progress */}
         <div className="mb-16 rounded-3xl bg-white p-8 shadow-xl shadow-accent/5 border border-border/50">
           <div className="mb-4 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">
-                Curating Progress
+                Core Face Readiness
               </span>
               <p className="text-2xl font-bold font-sans">
-                {Math.round(totalCategories > 0 ? (totalFilled / totalCategories) * 100 : 0)}% <span className="text-sm font-medium text-foreground/40 font-sans">Complete</span>
+                {coreProgress}% <span className="text-sm font-medium text-foreground/40 font-sans">{coreProgress === 100 ? "Ready for Analysis" : "Complete"}</span>
               </p>
             </div>
             <div className="text-right">
                <span className="text-sm font-bold font-sans text-accent">
-                {totalFilled} <span className="text-foreground/20">/</span> {totalCategories}
+                {coreFilled} <span className="text-foreground/20">/</span> {coreTotal} <span className="text-[10px] uppercase text-foreground/20 ml-1">Core items</span>
               </span>
             </div>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
               className="h-full bg-accent transition-all duration-700 ease-out"
-              style={{ width: `${totalCategories > 0 ? (totalFilled / totalCategories) * 100 : 0}%` }}
+              style={{ width: `${coreProgress}%` }}
             />
           </div>
+          {coreProgress < 100 && (
+            <p className="mt-4 text-[10px] text-foreground/40 italic font-sans">
+              Tip: Add a Primer, Foundation, and Setting Powder to see full stability insights.
+            </p>
+          )}
         </div>
 
         {/* Face area group tiles */}
         <div className="flex flex-wrap justify-center gap-6">
-          {categoryGroups.map((group) => {
+          {displayedGroups.map((group) => {
             const Icon = groupIcons[group.key] ?? Circle;
             const filled = group.categories.filter(
               (cat) => filledSlots[cat]
@@ -234,6 +250,32 @@ export default function BuildPage() {
             );
           })}
         </div>
+
+        {/* Add Detail drawer toggle */}
+        {!showAllGroups && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={() => setShowAllGroups(true)}
+              className="group flex items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-white/50 px-8 py-6 transition-all hover:border-accent hover:bg-white hover:shadow-xl hover:shadow-accent/5 font-sans"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-accent transition-colors group-hover:bg-accent group-hover:text-white">
+                <ChevronRight className="h-5 w-5 rotate-90" />
+              </div>
+              <div className="text-left">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground">Add Details</p>
+                <p className="text-[10px] text-foreground/40">Eyes, Lips, Brows, and Cheeks</p>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Makeup Recipe Card — Sophisticated Final Summary */}
+        {recipeCard && !isAnalyzing && (
+          <MakeupRecipeCard 
+            recipe={recipeCard} 
+            overallScore={overallScore} 
+          />
+        )}
       </div>
     </div>
   );

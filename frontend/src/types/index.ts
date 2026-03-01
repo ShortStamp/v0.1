@@ -120,4 +120,35 @@ export interface CompatibilityInfo {
   debugTrace: string[];
 }
 
+export interface BlueprintStep {
+  step_number: number;
+  category: string;
+  product_id: string;
+  product_name: string;
+  insight: string;
+}
+
+export interface ArtistNote {
+  title: string;
+  content: string;
+  severity: "info" | "warning" | "success";
+}
+
+export interface SafetyCheck {
+  label: string;
+  description: string;
+  passed: boolean;
+}
+
+export interface MakeupRecipeCard {
+  stability_index: number;
+  status_label: "Compatible" | "Warning: Texture Clash" | "Incompatible: Physical Failure";
+  blueprint: BlueprintStep[];
+  artist_notes: ArtistNote[];
+  safety_audit: SafetyCheck[];
+  missing_links: string[];
+  missing_category_keys: string[];
+  share_fingerprint: string;
+}
+
 export type CompatibilityMap = Record<string, CompatibilityInfo>;

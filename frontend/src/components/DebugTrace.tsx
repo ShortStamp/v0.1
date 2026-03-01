@@ -84,6 +84,7 @@ export function ConflictBadge({ compat, resolveName, position = "above", debugMo
   }, [open]);
 
   const isError = compat.severity === "error";
+  const isInfo = compat.severity === "info";
 
   // Human-friendly mapping for source agents
   const sourceLabels: Record<string, string> = {
@@ -106,10 +107,12 @@ export function ConflictBadge({ compat, resolveName, position = "above", debugMo
         className={`rounded-full px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] font-sans transition-all ${
           isError
             ? "bg-red-500 text-white hover:bg-red-600"
-            : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+            : isInfo
+              ? "bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100"
+              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
         }`}
       >
-        {isError ? "✕ Conflict" : "! Warning"}
+        {isError ? "✕ Conflict" : isInfo ? "ℹ Note" : "! Warning"}
       </button>
 
       {open && createPortal(
@@ -143,7 +146,7 @@ export function ConflictBadge({ compat, resolveName, position = "above", debugMo
             {allReasons.map((r, i) => (
               <div key={i} className="space-y-1">
                 <p className={`text-[7px] font-bold uppercase tracking-widest font-sans ${
-                  r.severity === "error" ? "text-red-500" : "text-amber-600"
+                  r.severity === "error" ? "text-red-500" : r.severity === "info" ? "text-blue-500" : "text-amber-600"
                 }`}>
                   {sourceLabels[r.agent] || "Expert Analysis"}
                 </p>

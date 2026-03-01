@@ -50,90 +50,97 @@ AESTHETIC_RULES: list[tuple[str, str, str, str, str, str]] = [
     (
         "skin_type", "oily",
         "finish", "dewy",
-        "warning",
-        "Shine warning: Dewy products can look greasy on oily skin. A matte finish usually looks more polished for you.",
+        "info",
+        "Aesthetic Note: Dewy products can look extra shiny on oily skin. Pro Tip: Use a mattifying primer in your T-zone to control oil while keeping the glow.",
     ),
     (
         "skin_type", "oily",
         "finish", "luminous",
-        "warning",
-        "Grease risk: Luminous finishes add extra shine, which might be too much for oily skin.",
+        "info",
+        "Aesthetic Note: Luminous finishes add shine. Pro Tip: Apply a translucent setting powder over oily areas to prevent a greasy look.",
     ),
     (
         "skin_type", "dry",
         "finish", "matte",
-        "warning",
-        "Drying note: Matte finishes can sometimes look flat or flaky on dry skin. Dewy or satin products usually feel better.",
+        "info",
+        "Aesthetic Note: Matte finishes can sometimes look flat or flaky on dry skin. Pro Tip: Mix a drop of facial oil into your foundation for a more comfortable wear.",
     ),
     # --- Finish preference vs product finish ---
     (
         "finish", "matte",
         "finish", "dewy",
-        "warning",
-        "Preference check: You prefer matte, but this product has a dewy (shiny) finish.",
+        "info",
+        "Preference Note: You prefer matte, but this product has a dewy finish. Pro Tip: Set this with a matte powder to achieve your desired look.",
     ),
     (
         "finish", "matte",
         "finish", "luminous",
-        "warning",
-        "Preference mismatch: You like matte looks, but this product is designed to be luminous.",
+        "info",
+        "Preference Note: You like matte looks, but this product is luminous. Pro Tip: Use a matte setting spray to dial down the luminosity.",
     ),
     (
         "finish", "dewy",
         "finish", "matte",
-        "warning",
-        "Style mismatch: You prefer a dewy glow, but this product has a matte finish.",
+        "info",
+        "Preference Note: You prefer a dewy glow, but this product is matte. Pro Tip: Layer a liquid highlighter underneath for a 'glow from within' effect.",
     ),
     (
         "finish", "natural",
         "finish", "glitter",
-        "warning",
-        "Style note: This might be too bold since you usually prefer a natural look.",
+        "info",
+        "Style Note: This glitter finish is bolder than your natural preference. Pro Tip: Apply with a light hand or as a focal point to keep it balanced.",
     ),
     # --- Coverage preference vs product coverage ---
     (
         "coverage", "light",
         "coverage", "full",
-        "warning",
-        "Preference check: This full-coverage product might look heavier than the light look you prefer.",
+        "info",
+        "Coverage Note: This full-coverage product is heavier than your light preference. Pro Tip: Sheer it out by mixing with moisturizer or using a damp sponge.",
     ),
     (
         "coverage", "full",
         "coverage", "sheer",
-        "warning",
-        "Preference mismatch: This might be too light since you usually prefer full coverage.",
+        "info",
+        "Coverage Note: This sheer product might be lighter than you prefer. Pro Tip: Layer it in areas where you need more coverage, or use a high-pigment concealer.",
     ),
     (
         "coverage", "full",
         "coverage", "light",
-        "warning",
-        "Style note: This light-coverage product might not provide the full coverage you like.",
+        "info",
+        "Coverage Note: This light-coverage product might not meet your full-coverage preference. Pro Tip: Use a 'spot concealing' technique for extra coverage where needed.",
     ),
     # --- Skin type targeted formula vs user skin type ---
     (
         "skin_type", "dry",
         "skin_type", "oily",
-        "warning",
-        "Moisture mismatch: This is for oily skin and might feel too drying for your dry skin type.",
+        "info",
+        "Formula Note: This is for oily skin and might feel drying. Pro Tip: Ensure your skin is well-hydrated with a rich moisturizer before application.",
     ),
     (
         "skin_type", "oily",
         "skin_type", "dry",
-        "warning",
-        "Weight warning: This rich formula for dry skin might feel too heavy or greasy on oily skin.",
+        "info",
+        "Formula Note: This rich formula for dry skin might feel heavy. Pro Tip: Use a very thin layer and set immediately with powder to prevent sliding.",
     ),
     # --- Undertone mismatches (warning level — escalated to error for foundation/concealer below) ---
     (
         "undertone", "cool",
         "undertone", "warm",
         "warning",
-        "Tone mismatch: This warm-toned shade might clash with your cool skin tone.",
+        "Tone Mismatch: This warm-toned shade might clash with your cool skin tone. Pro Tip: Use a neutral-toned setting powder to help bridge the color difference.",
     ),
     (
         "undertone", "warm",
         "undertone", "cool",
         "warning",
-        "Color clash: This cool-toned shade might not look quite right with your warm skin tone.",
+        "Tone Mismatch: This cool-toned shade might not look quite right with your warm skin tone. Pro Tip: Warm up the perimeter of your face with a bronzer.",
+    ),
+    # --- Photo-reactive / Environment (Bismuth) ---
+    (
+        "budget", "luxury",
+        "specs", "bismuth",
+        "info",
+        "Lighting Note: This product contains Bismuth, which can look metallic in direct sunlight. Pro Tip: Best reserved for evening or indoor events where lighting is controlled.",
     ),
 ]
 
@@ -532,40 +539,175 @@ def _run_flashback_risk_check(
 def _run_crease_prediction_check(
     products: list[ProductSnapshot],
 ) -> dict[str, CompatibilityResponse]:
+... [TRUNCATED] ...
+        )
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Migration & Bleed Predictor — viscosity vs fine lines
+# ---------------------------------------------------------------------------
+
+def _run_migration_bleed_check(
+    products: list[ProductSnapshot],
+    profile: BeautyProfileSnapshot,
+) -> dict[str, CompatibilityResponse]:
     """
-    Flag hydrating face formulas when no setting powder is in the build.
-    Without a setter, hydrating formulas migrate into fine lines within hours.
+    Check if thin lip products (lip-gloss, lip-oil) are used on skin with 'fine_lines' 
+    without a wax barrier (lip-liner).
     """
     results: dict[str, CompatibilityResponse] = {}
-
-    has_powder = any(p.category == "powder" for p in products)
-    if has_powder:
+    
+    concerns = [c.lower() for c in (profile.concerns or [])]
+    has_fine_lines = "fine_lines" in concerns or "aging" in concerns
+    
+    if not has_fine_lines:
         return results
+        
+    lip_products = [p for p in products if p.category in ("lip-gloss", "lipstick")]
+    has_liner = any(p.category == "lip-liner" for p in products)
+    
+    if has_liner:
+        return results
+        
+    for p in lip_products:
+        finish = str(p.filters.get("finish", "")).lower()
+        if finish in ("glossy", "shimmer", "clear") or p.category == "lip-gloss":
+            results[p.id] = CompatibilityResponse(
+                is_compatible=False,
+                reason=(
+                    "Structural Failure: Bleeding. This formula is too fluid for your skin texture; "
+                    "it will migrate into fine lines within 60 minutes without a wax-based barrier (Lip Liner)."
+                ),
+                severity="warning",
+                source_agent="artist",
+                conflicting_product_ids=[],
+            )
+            
+    return results
 
-    face_products = [p for p in products if p.category in _HYDRATING_FACE_CATEGORIES]
-    for p in face_products:
-        product_type = str(p.filters.get("type", "")).lower()
-        specs = str(p.filters.get("specs", "")).lower()
-        formula = str(p.filters.get("formula", "")).lower()
 
-        is_hydrating = product_type == "hydrating" or (
-            "hydrating" in specs and formula in ("liquid", "cream")
-        )
-        if not is_hydrating:
-            continue
+# ---------------------------------------------------------------------------
+# Porosity Trap — Primer particle size vs skin texture
+# ---------------------------------------------------------------------------
 
-        results[p.id] = CompatibilityResponse(
+def _run_porosity_trap_check(
+    products: list[ProductSnapshot],
+    profile: BeautyProfileSnapshot,
+) -> dict[str, CompatibilityResponse]:
+    """
+    Check if luminous primers are used on skin with 'large_pores' or 'acne_scarring'.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+    
+    concerns = [c.lower() for c in (profile.concerns or [])]
+    has_texture = "large_pores" in concerns or "acne_scarring" in concerns or "texture" in concerns
+    
+    if not has_texture:
+        return results
+        
+    primers = [p for p in products if p.category == "primer"]
+    for p in primers:
+        finish = str(p.filters.get("finish", "")).lower()
+        ptype = str(p.filters.get("type", "")).lower()
+        
+        if finish in ("luminous", "dewy", "radiant") or ptype == "hydrating":
+            # Check if it's explicitly blurring
+            if "blurring" in ptype or "pore-filling" in ptype:
+                continue
+                
+            results[p.id] = CompatibilityResponse(
+                is_compatible=False,
+                reason=(
+                    "Texture Amplification. Luminous primers act like a spotlight on skin texture. "
+                    "For your profile, a 'Blurring/Crosspolymer' base is required to level the surface before foundation."
+                ),
+                severity="warning",
+                source_agent="artist",
+                conflicting_product_ids=[],
+            )
+            
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Opacity Stacking — Pigment density check (Mask Effect)
+# ---------------------------------------------------------------------------
+
+def _run_opacity_stacking_check(
+    products: list[ProductSnapshot],
+) -> dict[str, CompatibilityResponse]:
+    """
+    Check if Foundation + Concealer + Powder are all high-coverage/tinted.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+    
+    base_ops = [p for p in products if p.category in ("foundation", "concealer", "powder")]
+    if len(base_ops) < 3:
+        return results
+        
+    high_opacity_count = 0
+    high_opacity_ids = []
+    
+    for p in base_ops:
+        coverage = str(p.filters.get("coverage", "")).lower()
+        ptype = str(p.filters.get("type", "")).lower()
+        
+        if coverage == "full" or (p.category == "powder" and ptype == "pressed"):
+            high_opacity_count += 1
+            high_opacity_ids.append(p.id)
+            
+    if high_opacity_count >= 3:
+        for pid in high_opacity_ids:
+            results[pid] = CompatibilityResponse(
+                is_compatible=False,
+                reason=(
+                    "Dimensional Loss. Stacking three high-opacity layers will flatten your natural facial shadows. "
+                    "You will need a high-contrast Bronzer/Contour to add back dimension, or consider a sheerer powder."
+                ),
+                severity="warning",
+                source_agent="artist",
+                conflicting_product_ids=[id for id in high_opacity_ids if id != pid],
+            )
+            
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Anatomical Harmony — Mascara vs Eyeliner Contrast
+# ---------------------------------------------------------------------------
+
+def _run_anatomical_harmony_check(
+    products: list[ProductSnapshot],
+) -> dict[str, CompatibilityResponse]:
+    """
+    Check contrast ratio between mascara and eyeliner.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+    
+    mascara = next((p for p in products if p.category == "mascara"), None)
+    liner = next((p for p in products if p.category == "eyeliner"), None)
+    
+    if not mascara or not liner:
+        return results
+        
+    # Heuristic: 'black' liner vs non-'black' mascara
+    liner_color = str(liner.filters.get("color", "black")).lower()
+    mascara_color = str(mascara.filters.get("color", "black")).lower()
+    
+    if "black" in liner_color and "black" not in mascara_color and "brown" in mascara_color:
+        results[liner.id] = CompatibilityResponse(
             is_compatible=False,
             reason=(
-                f"Migration Risk: {p.name} is a hydrating (non-setting) formula. "
-                "Without a setting powder in your build, it will migrate into fine "
-                "lines and break down within 2–3 hours."
-            )[:300],
+                "Visual Recessions. The heavy black liner will 'swallow' your lashes, making them look shorter. "
+                "Match your mascara intensity to your liner for a cohesive eye frame."
+            ),
             severity="warning",
             source_agent="artist",
-            conflicting_product_ids=[],
+            conflicting_product_ids=[mascara.id],
         )
-
+        
     return results
 
 
@@ -746,19 +888,24 @@ PRODUCTS IN BUILD:
 RULE-BASED FINDINGS (already detected, do not repeat):
 {rule_summary}
 
-TASK: Identify any additional aesthetic mismatches NOT already captured above.
-Consider:
+TASK: Identify any additional aesthetic or MECHANICAL mismatches NOT already captured above.
+Prioritize how the makeup behaves physically over time, not just the initial color match.
+
+Evaluate the Mechanical Stability of the products:
+- Look for 'Bleed Risks' (thin liquids vs. textured skin/fine lines).
+- Look for 'Texture Amplification' (shimmer/luminous products over pores or scarring).
+- Look for 'Opacity Overload' (stacking too many high-coverage layers causing a mask effect).
+- Consider 'Anatomical Harmony' (contrast ratios between mascara and liner).
+- Consider 'Sunlight/Environment' (ingredients like Bismuth Oxychloride looking unnatural in daylight).
+
+Also consider:
 - Finish harmony: does the product finish suit the user's skin type and finish preference?
 - Coverage alignment: does the coverage level match the user's stated preference?
-- Color integrity: does the product's tone/undertone suit the user's skin tone and undertone? Undertone clashes on foundation/concealer are errors, not just warnings.
+- Color integrity: does the product's tone/undertone suit the user's skin tone and undertone?
 - Powder sandwich / texture layering violations (cream/liquid over powder = mud)
-- Cumulative luminosity / grease risk from too many dewy/shimmer products
-- Under-eye creasing from matte concealer over dry or fine-line-prone skin without hydrating prep
+- Under-eye creasing from matte concealer over dry skin without hydrating prep
 - Visual base load: multiple full-coverage base products creating a cakey, mask-like finish
 - Color temperature: warm and cool-toned cheek products clashing on the cheekbone
-- Flashback risk: high-concentration silica, zinc oxide, or titanium dioxide in powders
-- Migration: hydrating (non-setting) formulas used without a setting powder
-- Category-level aesthetics: e.g. heavy full-glam contouring over sheer base looks mismatched
 
 STRICT EXCLUSIONS — do NOT flag these:
 - Silicone-vs-water pilling, dimethicone, adhesion, layering physics — these are formulation
@@ -766,7 +913,7 @@ STRICT EXCLUSIONS — do NOT flag these:
 - Conflicts already listed in RULE-BASED FINDINGS above — do not repeat or re-escalate them.
 - Solid/wax/powder products for any layering reason — powders, pencils, mascaras do not pill.
 
-Focus on genuine aesthetic incompatibilities against the user's profile. Be concise (max 250 chars per reason).
+Focus on genuine aesthetic and structural incompatibilities against the user's profile. Be concise (max 250 chars per reason).
 If no additional mismatches exist beyond the rule findings, return an empty verdicts list."""
 
     try:
@@ -926,17 +1073,25 @@ async def run_artist_analysis(
     color_harmony_results = _run_color_harmony_check(products)
     flashback_risk_results = _run_flashback_risk_check(products)
     crease_prediction_results = _run_crease_prediction_check(products)
+    
+    # New Mechanical Stability passes
+    migration_bleed_results = _run_migration_bleed_check(products, beauty_profile)
+    porosity_trap_results = _run_porosity_trap_check(products, beauty_profile)
+    opacity_stacking_results = _run_opacity_stacking_check(products)
+    anatomical_harmony_results = _run_anatomical_harmony_check(products)
 
     # Merge physical results into rule findings (higher severity wins)
     combined = dict(rule_findings)
     pass_labels = [
         "powder_sandwich", "glow_check", "under_eye",
         "visual_weight", "color_harmony", "flashback_risk", "crease_prediction",
+        "migration_bleed", "porosity_trap", "opacity_stacking", "anatomical_harmony",
     ]
     all_pass_results = [
         powder_results, glow_results, under_eye_results,
         visual_weight_results, color_harmony_results, flashback_risk_results,
         crease_prediction_results,
+        migration_bleed_results, porosity_trap_results, opacity_stacking_results, anatomical_harmony_results,
     ]
     for label, physical in zip(pass_labels, all_pass_results):
         for pid, resp in physical.items():
@@ -988,6 +1143,7 @@ def _build_artist_pass_traces(
         trace = [
             "ARTIST PASS: aesthetic profile rules — no mismatches against beauty profile",
             "ARTIST PASS: physical checks — powder sandwich OK · glow OK · under-eye OK",
+            "ARTIST PASS: mechanical stability — bleed risk OK · texture amplification OK · opacity balance OK",
             "ARTIST PASS: visual weight — base load within threshold",
             "ARTIST PASS: color harmony — cheek temperature consistent",
             "ARTIST PASS: flashback risk — no high-concentration reflective ingredients in top INCI",

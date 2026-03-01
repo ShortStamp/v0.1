@@ -174,6 +174,132 @@ async def trend_node(state: AgentState) -> dict:
         return {"errors": [*state.errors, f"trend: {exc}"]}
 
 
+def _build_recipe_card(
+    state: AgentState, 
+    compatibility_map: dict[str, OrchestratorOutput.CompatibilityResponse], 
+    score: float, 
+    fingerprint: str
+) -> OrchestratorOutput.MakeupRecipeCard:
+    """
+    Constructs the sophisticated summary card from agent results.
+    """
+    from app.schemas.compatibility import BlueprintStep, ArtistNote, SafetyCheck, MakeupRecipeCard
+
+    # 1. Status & Stability
+    status_label = "Compatible"
+    if state.has_physical_failure:
+        status_label = "Incompatible: Physical Failure"
+    elif any(r.severity == "error" for r in compatibility_map.values()):
+        status_label = "Warning: Texture Clash" # Or keep "Compatible" if warnings only
+    elif any(r.severity == "warning" for r in compatibility_map.values()):
+        status_label = "Warning: Texture Clash"
+
+    # 2. Application Blueprint
+    blueprint = []
+    # Map category names for better display
+    cat_map = {p.id: p.category for p in state.products}
+    for step in state.application_order:
+        blueprint.append(BlueprintStep(
+            step_number=step.step,
+            category=cat_map.get(step.product_id, "unknown"),
+            product_id=step.product_id,
+            product_name=step.product_name,
+            insight=step.note or "Apply as directed by formula analysis."
+        ))
+
+    # 3. Artist Notes (Aesthetic insights)
+    artist_notes = []
+    
+    # Glow / Texture check
+    glow_issues = [r for pid, r in state.artist_results.items() if any(k in r.reason for k in ["Glow", "Texture", "Surface"])]
+    if glow_issues:
+        artist_notes.append(ArtistNote(
+            title="Texture Harmony",
+            content=glow_issues[0].reason,
+            severity="warning"
+        ))
+    else:
+        artist_notes.append(ArtistNote(
+            title="Texture Harmony",
+            content="Your selected products share compatible finishes for a balanced, natural glow.",
+            severity="success"
+        ))
+
+    # Tone / Undertone check
+    tone_issues = [r for pid, r in state.artist_results.items() if any(k in r.reason for k in ["Tone", "Color", "Undertone", "Match"])]
+    if tone_issues:
+        artist_notes.append(ArtistNote(
+            title="Tone Harmony",
+            content=tone_issues[0].reason,
+            severity="warning"
+        ))
+    else:
+        artist_notes.append(ArtistNote(
+            title="Tone Harmony",
+            content="The color palette across your selections is visually stable and flattering.",
+            severity="success"
+        ))
+
+    # 4. Safety Audit (Chemical insights)
+    safety_audit = []
+    
+    # Pilling / Adhesion
+    pilling_risk = any(any(k in r.reason.lower() for k in ["pill", "silicone", "separation"]) for r in state.chemist_results.values())
+    safety_audit.append(SafetyCheck(
+        label="No Pilling",
+        description="Layering order optimized for Silicone/Water compatibility." if not pilling_risk else "Adhesion risks detected; follow application order strictly.",
+        passed=not pilling_risk
+    ))
+
+    # Skin Barrier
+    barrier_risk = any(any(k in r.reason.lower() for k in ["irritation", "sensitive", "redness", "burning"]) for r in state.chemist_results.values())
+    safety_audit.append(SafetyCheck(
+        label="Barrier Safe",
+        description="No harsh concentrations found for your skin type." if not barrier_risk else "Potentially irritating actives detected; monitor for sensitivity.",
+        passed=not barrier_risk
+    ))
+
+    # 5. Missing Links
+    # We'll consider all categories in the "Base" group plus anything else common
+    # but specifically focus on completing the face logic.
+    core_categories = ["primer", "foundation", "concealer", "powder", "setting-spray"]
+    present_categories = {p.category for p in state.products}
+    missing_category_keys = [c for c in core_categories if c not in present_categories]
+    
+    missing_links = []
+    if "primer" in missing_category_keys:
+        skin_type = (state.beauty_profile.skin_type or "").lower() if state.beauty_profile else ""
+        if skin_type == "oily":
+            missing_links.append("Missing Primer: Your 'Oily' skin needs a mattifying base to keep this set stable for 8+ hours.")
+        else:
+            missing_links.append("Missing Primer: A base layer would improve the longevity and adhesion of your foundation.")
+    
+    if "foundation" in missing_category_keys:
+        missing_links.append("Missing Foundation: The centerpiece of your build is missing. We can suggest a formula that bridges your primer and powder.")
+
+    if "powder" in missing_category_keys:
+        missing_links.append("Missing Powder: A setting step is recommended to prevent 'mudding' or product migration.")
+    
+    if "concealer" in missing_category_keys:
+        missing_links.append("Missing Concealer: For targeted coverage that matches your build's texture and tone.")
+
+    if not missing_links and missing_category_keys:
+        # Generic message for other missing core items like setting spray
+        first_missing = missing_category_keys[0].replace("-", " ").title()
+        missing_links.append(f"Complete the Set: You're missing a {first_missing} to fully round out your routine.")
+
+    return MakeupRecipeCard(
+        stability_index=score,
+        status_label=status_label,
+        blueprint=blueprint,
+        artist_notes=artist_notes,
+        safety_audit=safety_audit,
+        missing_links=missing_links,
+        missing_category_keys=missing_category_keys,
+        share_fingerprint=fingerprint
+    )
+
+
 async def aggregate_node(state: AgentState) -> dict:
     """
     Merge all agent results, compute overall score, persist cache rows, and
@@ -207,7 +333,13 @@ async def aggregate_node(state: AgentState) -> dict:
                 merged_reasons.append(nr)
         
         # Determine highest severity
-        final_severity = "error" if (existing.severity == "error" or new_resp.severity == "error") else "warning"
+        severity_rank = {"error": 3, "warning": 2, "info": 1}
+        existing_rank = severity_rank.get(existing.severity, 0)
+        new_rank = severity_rank.get(new_resp.severity, 0)
+        
+        final_severity = existing.severity
+        if new_rank > existing_rank:
+            final_severity = new_resp.severity
         
         # Chemist formulation conflicts usually take priority for the main 'reason' string (legacy support)
         # unless artist physical error occurs.
@@ -220,10 +352,10 @@ async def aggregate_node(state: AgentState) -> dict:
         final_reason = existing.reason
         final_source = existing.source_agent
         
-        if is_artist_physical_error or (new_resp.severity == "error" and existing.severity == "warning"):
+        if is_artist_physical_error or (new_rank > existing_rank):
             final_reason = new_resp.reason
             final_source = new_resp.source_agent
-        elif existing.source_agent != "chemist" and new_resp.source_agent == "chemist":
+        elif existing.source_agent != "chemist" and new_resp.source_agent == "chemist" and new_rank >= existing_rank:
             final_reason = new_resp.reason
             final_source = new_resp.source_agent
 
@@ -236,7 +368,7 @@ async def aggregate_node(state: AgentState) -> dict:
         compatibility_map[pid] = existing.model_copy(update={
             "reason": final_reason,
             "reasons": merged_reasons,
-            "severity": final_severity,
+            "severity": final_severity, # type: ignore[arg-type]
             "source_agent": final_source,
             "conflicting_product_ids": merged_conflicts,
             "debug_trace": merged_trace
@@ -254,6 +386,7 @@ async def aggregate_node(state: AgentState) -> dict:
     has_physical_failure = state.has_physical_failure
     num_errors = sum(1 for r in compatibility_map.values() if r.severity == "error")
     num_warnings = sum(1 for r in compatibility_map.values() if r.severity == "warning")
+    # 'info' does not penalize score
     base_score = max(0.0, 1.0 - (num_errors * 0.30 + num_warnings * 0.10))
     # Physical failures cap the score at 0.1
     score = min(base_score, 0.1) if has_physical_failure else base_score
@@ -272,6 +405,13 @@ async def aggregate_node(state: AgentState) -> dict:
             if pid not in compatibility_map:
                 all_traces.setdefault(pid, []).extend(trace)
 
+    # Compute fingerprint for cache keying & shareable link
+    fingerprint = hashlib.sha256(
+        ",".join(sorted(state.product_ids)).encode()
+    ).hexdigest()
+
+    recipe_card = _build_recipe_card(state, compatibility_map, score, fingerprint)
+
     output = OrchestratorOutput(
         build_id=state.build_id,
         compatibility_map=compatibility_map,
@@ -279,14 +419,10 @@ async def aggregate_node(state: AgentState) -> dict:
         evaluated_at=now,
         overall_compatibility_score=round(score, 4),
         has_physical_failure=has_physical_failure,
+        recipe_card=recipe_card,
         errors=list(dict.fromkeys(state.errors)),  # deduplicate while preserving order
         all_traces=all_traces,
     )
-
-    # Compute fingerprint for cache keying
-    fingerprint = hashlib.sha256(
-        ",".join(sorted(state.product_ids)).encode()
-    ).hexdigest()
 
     # Persist each conflict verdict as a CompatibilityResult cache row.
     # Wrapped in try/except so a DB failure (e.g. FK violation for

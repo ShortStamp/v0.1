@@ -21,14 +21,113 @@ from app.agents.orchestrator import compatibility_graph
 from app.database import get_db
 from app.models.compatibility import CompatibilityResult
 from app.schemas.compatibility import (
+    CompatibilityReason,
     CompatibilityResponse,
     OrchestratorInput,
     OrchestratorOutput,
+    AutoFillInput,
+    AutoFillOutput,
+    AutoFillSuggestion,
 )
+from app.services import product_service
+from app.agents.chemist_agent import run_chemist_analysis
+from app.agents.artist_agent import run_artist_analysis
 
 logger = logging.getLogger(__name__)
 
+
 router = APIRouter(prefix="/compatibility", tags=["compatibility"])
+
+
+@router.post("/auto-fill", response_model=AutoFillOutput)
+async def auto_fill_build(
+    payload: AutoFillInput,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Suggests the best-fit products for missing categories based on current build.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models.product import Product
+    from app.schemas.compatibility import ProductSnapshot
+
+    # 1. Load current build products
+    current_products: list[ProductSnapshot] = []
+    if payload.current_product_ids:
+        result = await db.execute(
+            select(Product)
+            .where(Product.id.in_(payload.current_product_ids))
+            .options(selectinload(Product.filter_values))
+        )
+        rows = result.scalars().all()
+        for p in rows:
+            current_products.append(ProductSnapshot(
+                id=p.id,
+                name=p.name,
+                brand=p.brand.name if p.brand else "",
+                category=p.category_key,
+                inci_ingredients=p.inci_ingredients or [],
+                filters={fv.filter_key: fv.value for fv in p.filter_values}
+            ))
+
+    suggestions = []
+
+    # 2. For each missing category, find candidates
+    for cat_key in payload.missing_category_keys:
+        # Get top 10 highest scored products in this category
+        candidates_data = await product_service.list_products(
+            db, category=cat_key, sort="stamp_score_desc", per_page=10
+        )
+        
+        best_candidate = None
+        best_reason = "Selected based on high stability and user profile match."
+
+        for item in candidates_data.items:
+            # Check compatibility of this candidate with existing build
+            # We fetch full details for INCI
+            full_p = await product_service.get_product(db, item.id)
+            candidate_snap = ProductSnapshot(
+                id=full_p.id,
+                name=full_p.name,
+                brand=full_p.brand,
+                category=full_p.category,
+                inci_ingredients=full_p.inci_ingredients or [],
+                filters=full_p.filters
+            )
+
+            # Quick simulation: Run Chemist + Artist on (Current + This Candidate)
+            test_set = current_products + [candidate_snap]
+            
+            # Simple heuristic: If it passes basic rules, it's a suggestion
+            chemist_out = await run_chemist_analysis(test_set, payload.beauty_profile)
+            artist_out = await run_artist_analysis(test_set, payload.beauty_profile)
+
+            # If no errors for THIS product, pick it
+            has_error = False
+            if candidate_snap.id in chemist_out.results and chemist_out.results[candidate_snap.id].severity == "error":
+                has_error = True
+            if not has_error and candidate_snap.id in artist_out.results and artist_out.results[candidate_snap.id].severity == "error":
+                has_error = True
+            
+            if not has_error:
+                best_candidate = full_p
+                # Try to find a nice reason
+                skin_msg = f"matches your {payload.beauty_profile.skin_type} skin" if payload.beauty_profile and payload.beauty_profile.skin_type else "is a top-rated choice"
+                best_reason = f"Perfect match: {full_p.brand} {full_p.name} is chemically stable with your set and {skin_msg}."
+                break
+        
+        if best_candidate:
+            suggestions.append(AutoFillSuggestion(
+                category=cat_key,
+                product_id=best_candidate.id,
+                product_name=best_candidate.name,
+                product_data=product_service._product_to_detail_dict(best_candidate),
+                reason=best_reason
+            ))
+
+    return AutoFillOutput(suggestions=suggestions)
+
 
 # Cache TTL — re-run the graph if the cached result is older than this
 _CACHE_TTL_HOURS = 1

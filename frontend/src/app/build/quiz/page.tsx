@@ -429,13 +429,12 @@ export default function QuizPage() {
             )}
           </p>
 
-          {/* Skip + Retake */}
-          <div className="flex items-center justify-center gap-6">
+          <div className="flex flex-col gap-3">
             <button
               onClick={handleSkip}
-              className="py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 transition-colors hover:text-accent font-sans"
+              className="w-full rounded-2xl border border-border/50 bg-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] text-foreground transition-all hover:border-accent hover:text-accent font-sans"
             >
-              Skip for now
+              Skip for now &rarr;
             </button>
             <button
               onClick={() => {
@@ -569,15 +568,15 @@ export default function QuizPage() {
             {question.optional && (
               <button
                 onClick={confirmMultiSelect}
-                className="px-6 py-3 text-xs font-bold uppercase tracking-[0.15em] text-foreground/40 transition-colors hover:text-accent font-sans"
+                className="px-6 py-3 text-[11px] font-bold uppercase tracking-[0.15em] text-foreground/40 transition-colors hover:text-accent font-sans underline underline-offset-4"
               >
-                Skip
+                Skip Question
               </button>
             )}
             <button
               onClick={confirmMultiSelect}
               disabled={!question.optional && multiSelected.length === 0}
-              className="rounded-2xl bg-accent px-8 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-accent/20 transition-all hover:bg-pink-deep hover:shadow-pink-deep/30 hover:-translate-y-0.5 disabled:opacity-50 font-sans"
+              className="rounded-2xl bg-accent px-10 py-4 text-xs font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-accent/20 transition-all hover:bg-pink-deep hover:shadow-pink-deep/30 hover:-translate-y-0.5 disabled:opacity-50 font-sans"
             >
               {multiSelected.length > 0
                 ? `Continue (${multiSelected.length})`

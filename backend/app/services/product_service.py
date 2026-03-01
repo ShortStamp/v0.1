@@ -131,6 +131,66 @@ def _product_to_detail(product: Product) -> ProductDetail:
     )
 
 
+def _product_to_list_item_dict(product: Product) -> dict:
+    """Helper for auto-fill to get a camelCase dict matching frontend expectations."""
+    item = _product_to_list_item(product)
+    return {
+        "id": item.id,
+        "name": item.name,
+        "brand": item.brand,
+        "image": item.image,
+        "category": item.category,
+        "stampScore": item.stamp_score,
+        "prices": [
+            {
+                "retailer": p.retailer,
+                "retailerLogo": p.retailer_logo,
+                "price": p.price,
+                "url": p.url,
+                "inStock": p.in_stock
+            } for p in item.prices
+        ],
+        "filters": item.filters
+    }
+
+
+def _product_to_detail_dict(product: Product) -> dict:
+    """Helper for auto-fill to get a camelCase dict matching frontend expectations."""
+    detail = _product_to_detail(product)
+    return {
+        "id": detail.id,
+        "name": detail.name,
+        "brand": detail.brand,
+        "image": detail.image,
+        "category": detail.category,
+        "stampScore": detail.stamp_score,
+        "description": detail.description,
+        "specs": detail.specs,
+        "prices": [
+            {
+                "retailer": p.retailer,
+                "retailerLogo": p.retailer_logo,
+                "price": p.price,
+                "url": p.url,
+                "inStock": p.in_stock
+            } for p in detail.prices
+        ],
+        "filters": detail.filters,
+        "walmartUrl": detail.walmart_url,
+        "inciIngredients": detail.inci_ingredients,
+        "extraImageUrls": detail.extra_image_urls,
+        "variants": [
+            {
+                "shadeName": v.shade_name,
+                "hexColor": v.hex_color,
+                "imageUrl": v.image_url,
+                "price": v.price,
+                "isDefault": v.is_default
+            } for v in detail.variants
+        ] if detail.variants else []
+    }
+
+
 def _apply_category_and_search_filters(
     query,
     count_query,

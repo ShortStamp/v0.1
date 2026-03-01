@@ -15,7 +15,7 @@ class CompatibilityReason(BaseModel):
     """A single reason for a conflict or warning from a specific agent."""
     agent: Literal["chemist", "artist", "trend", "orchestrator"]
     text: str = Field(..., max_length=500)
-    severity: Literal["warning", "error"]
+    severity: Literal["info", "warning", "error"]
 
 
 class CompatibilityResponse(BaseModel):
@@ -33,11 +33,12 @@ class CompatibilityResponse(BaseModel):
         default_factory=list,
         description="All human-readable explanations from different agents.",
     )
-    severity: Literal["warning", "error"] = Field(
+    severity: Literal["info", "warning", "error"] = Field(
         ...,
         description=(
-            "'error' = strong formulation conflict (e.g. silicone over water-based). "
-            "'warning' = soft mismatch (e.g. dewy finish over oily skin)."
+            "'error' = strong formulation conflict. "
+            "'warning' = moderate issue. "
+            "'info' = aesthetic note or pro tip."
         ),
     )
     source_agent: Literal["chemist", "artist", "trend", "orchestrator"]
@@ -49,6 +50,83 @@ class CompatibilityResponse(BaseModel):
         default_factory=list,
         description="Step-by-step decision log for debugging (shown in frontend dev panel)",
     )
+
+
+# ---------------------------------------------------------------------------
+# Makeup Recipe Card — Sophisticated summary output
+# ---------------------------------------------------------------------------
+
+class BlueprintStep(BaseModel):
+    step_number: int
+    category: str
+    product_id: str
+    product_name: str
+    insight: str = Field(..., description="The 'Why' behind this step (e.g., 'Acts as a bridge...')")
+
+
+class ArtistNote(BaseModel):
+    title: str  # e.g., "Tone Harmony", "Texture Alert", "Shade Confidence"
+    content: str
+    severity: Literal["info", "warning", "success"]
+
+
+class SafetyCheck(BaseModel):
+    label: str  # e.g., "No Pilling", "Barrier Safe"
+    description: str
+    passed: bool
+
+
+class MakeupRecipeCard(BaseModel):
+    """
+    The sophisticated 'Makeup Recipe Card' summary.
+    Explains the physical and aesthetic 'Logic of the Face'.
+    """
+    stability_index: float = Field(..., ge=0, le=1.0)
+    status_label: Literal["Compatible", "Warning: Texture Clash", "Incompatible: Physical Failure"]
+    
+    # The Core Guide
+    blueprint: list[BlueprintStep]
+    
+    # Expert Insights
+    artist_notes: list[ArtistNote]
+    safety_audit: list[SafetyCheck]
+    
+    # Missing Link (Ghost slots)
+    missing_links: list[str] = Field(
+        default_factory=list,
+        description="List of human-readable insights about missing categories",
+    )
+    missing_category_keys: list[str] = Field(
+        default_factory=list,
+        description="List of raw category keys (e.g. 'primer') that are missing",
+    )
+    
+    # Shareable fingerprint (SHA-256)
+    share_fingerprint: str
+
+
+# ---------------------------------------------------------------------------
+# Auto-Fill — Automatic gap filling
+# ---------------------------------------------------------------------------
+
+class AutoFillInput(BaseModel):
+    current_product_ids: list[str]
+    missing_category_keys: list[str]
+    beauty_profile: BeautyProfileSnapshot | None = None
+
+
+class AutoFillSuggestion(BaseModel):
+    category: str
+    product_id: str
+    product_name: str
+    # Product data for frontend cache
+    product_data: dict = Field(..., description="Full product data for frontend caching")
+    # Why this was picked
+    reason: str
+
+
+class AutoFillOutput(BaseModel):
+    suggestions: list[AutoFillSuggestion]
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +161,9 @@ class OrchestratorOutput(BaseModel):
         default=False,
         description="True when Artist Agent detected a physical texture conflict (score capped at 0.1)",
     )
+    # The sophisticated summary card
+    recipe_card: MakeupRecipeCard | None = None
+    
     # Agent-level error tags — e.g. "quota_exceeded" when Gemini returns 429
     errors: list[str] = Field(default_factory=list)
     # Debug traces for compatible products (keyed by product_id).
