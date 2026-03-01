@@ -6,6 +6,7 @@ import { BeautyProfile } from "@/types";
 import { quizQuestions } from "@/lib/quiz";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import {
   Cloud,
   Sun,
@@ -121,6 +122,9 @@ export default function QuizPage() {
     if (existing) {
       // Quiz done, show auth prompt
       setDone(true);
+    } else {
+      // Fresh quiz start — fire event once
+      analytics.quizStarted();
     }
     // Show the page
     setReady(true);
@@ -147,6 +151,7 @@ export default function QuizPage() {
           setStep(step + 1);
         } else {
           localStorage.setItem("beautyProfile", JSON.stringify(updated));
+          analytics.quizCompleted(updated as Record<string, unknown>);
           setDone(true);
         }
       }, 300);
@@ -164,6 +169,7 @@ export default function QuizPage() {
       setStep(step + 1);
     } else {
       localStorage.setItem("beautyProfile", JSON.stringify(updated));
+      analytics.quizCompleted(updated as Record<string, unknown>);
       setDone(true);
     }
   }, [answers, question, step, total, multiSelected]);

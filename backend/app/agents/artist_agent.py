@@ -539,7 +539,38 @@ def _run_flashback_risk_check(
 def _run_crease_prediction_check(
     products: list[ProductSnapshot],
 ) -> dict[str, CompatibilityResponse]:
-... [TRUNCATED] ...
+    """
+    Flag hydrating face formulas when no setting powder is in the build.
+    Without a setter, hydrating formulas migrate into fine lines within hours.
+    """
+    results: dict[str, CompatibilityResponse] = {}
+
+    has_powder = any(p.category == "powder" for p in products)
+    if has_powder:
+        return results
+
+    face_products = [p for p in products if p.category in _HYDRATING_FACE_CATEGORIES]
+    for p in face_products:
+        product_type = str(p.filters.get("type", "")).lower()
+        specs = str(p.filters.get("specs", "")).lower()
+        formula = str(p.filters.get("formula", "")).lower()
+
+        is_hydrating = product_type == "hydrating" or (
+            "hydrating" in specs and formula in ("liquid", "cream")
+        )
+        if not is_hydrating:
+            continue
+
+        results[p.id] = CompatibilityResponse(
+            is_compatible=False,
+            reason=(
+                f"Migration Risk: {p.name} is a hydrating (non-setting) formula. "
+                "Without a setting powder in your build, it will migrate into fine "
+                "lines and break down within 2–3 hours."
+            )[:300],
+            severity="warning",
+            source_agent="artist",
+            conflicting_product_ids=[],
         )
 
     return results

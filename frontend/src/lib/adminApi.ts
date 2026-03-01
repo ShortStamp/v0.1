@@ -142,6 +142,56 @@ function toQueryString(params: Record<string, string | number | boolean | undefi
   return s ? `?${s}` : "";
 }
 
+// ---- Analytics types ----
+
+export interface AnalyticsSummary {
+  quiz_completions: number;
+  unique_sessions: number;
+  affiliate_clicks: number;
+  active_users_30d: number;
+}
+
+export interface DailyCount {
+  day: string;
+  count: number;
+}
+
+export interface LabelCount {
+  label: string;
+  count: number;
+}
+
+export interface QuizDistribution {
+  skin_tone: LabelCount[];
+  finish: LabelCount[];
+  coverage: LabelCount[];
+}
+
+export interface TopProductRow {
+  product_name: string | null;
+  product_brand: string | null;
+  count: number;
+}
+
+export interface TopAffiliateRow {
+  product_id: string | null;
+  retailer: string | null;
+  count: number;
+}
+
+export interface CategoryHeatmapRow {
+  category: string | null;
+  count: number;
+}
+
+export interface CohortRow {
+  cohort_week: string;
+  w0: number | null;
+  w1: number | null;
+  w2: number | null;
+  w4: number | null;
+}
+
 export interface IngestionStats {
   missing_ingredients: number;
   total_active: number;
@@ -223,4 +273,26 @@ export const adminApi = {
 
   getAgentStatus: () =>
     adminFetch<JobStatusResponse>("/admin/ingestion/ingredient-agent/status"),
+
+  // ---- Analytics ----
+  getAnalyticsSummary: () =>
+    adminFetch<AnalyticsSummary>("/admin/analytics/summary"),
+
+  getQuizTrend: (days = 30) =>
+    adminFetch<DailyCount[]>(`/admin/analytics/quiz-trend?days=${days}`),
+
+  getQuizDistribution: () =>
+    adminFetch<QuizDistribution>("/admin/analytics/quiz-distribution"),
+
+  getTopProductsAdded: (limit = 10) =>
+    adminFetch<TopProductRow[]>(`/admin/analytics/top-products-added?limit=${limit}`),
+
+  getTopAffiliateClicks: (limit = 10) =>
+    adminFetch<TopAffiliateRow[]>(`/admin/analytics/top-affiliate-clicks?limit=${limit}`),
+
+  getCategoryHeatmap: () =>
+    adminFetch<CategoryHeatmapRow[]>("/admin/analytics/category-heatmap"),
+
+  getCohortRetention: () =>
+    adminFetch<CohortRow[]>("/admin/analytics/cohort"),
 };

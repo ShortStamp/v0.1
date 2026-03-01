@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.admin import router as admin_router
+from app.api.analytics import admin_analytics_router, ingest_router as analytics_ingest_router
 from app.api.auth import router as auth_router
 from app.api.ingestion import router as ingestion_router
 from app.api.builds import router as builds_router
@@ -13,6 +14,8 @@ from app.api.users import router as users_router
 
 api_router = APIRouter()
 api_router.include_router(admin_router)
+api_router.include_router(admin_analytics_router)
+api_router.include_router(analytics_ingest_router)
 api_router.include_router(ingestion_router)
 api_router.include_router(auth_router)
 api_router.include_router(categories_router)

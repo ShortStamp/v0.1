@@ -6,6 +6,7 @@ import { CategoryKey, Product, CategoryDefinition, CompatibilityMap } from "@/ty
 import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
 import { readBuildSlots, saveBuildSlot, saveBuildProductToCache, readBuildProductCache } from "@/lib/buildSlots";
+import { analytics } from "@/lib/analytics";
 import { getQuizAutoFilters } from "@/lib/personalization";
 import Link from "next/link";
 import { ArrowLeft, Search, Star, Plus, LayoutGrid, List, Check, Loader2, ExternalLink } from "lucide-react";
@@ -305,6 +306,12 @@ export default function CategoryPage() {
   const selectProduct = (product: Product) => {
     saveBuildSlot(categoryKey, product.id);
     saveBuildProductToCache(product.id, product);
+    analytics.productAddedToBuild({
+      product_id: product.id,
+      product_name: product.name,
+      product_brand: product.brand ?? "",
+      category: categoryKey,
+    });
     router.push("/build");
   };
 

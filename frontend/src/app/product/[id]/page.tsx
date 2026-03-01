@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Product, ProductVariant } from "@/types";
 import { api } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import ShortStampBadge from "@/components/ShortStampBadge";
 import PriceComparisonTable from "@/components/PriceComparisonTable";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
@@ -149,6 +150,13 @@ export default function ProductPage() {
                 href={bestRetailer.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() =>
+                  analytics.affiliateLinkClicked({
+                    product_id: product.id,
+                    product_name: product.name,
+                    retailer: bestRetailer.retailer,
+                  })
+                }
                 className="group inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-accent px-8 py-5 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-xl shadow-accent/20 transition-all duration-300 hover:bg-pink-deep hover:shadow-pink-deep/30 hover:-translate-y-1 font-sans"
               >
                 Purchase via {bestRetailer.retailer}
@@ -162,6 +170,13 @@ export default function ProductPage() {
                   href={walmartUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() =>
+                    analytics.affiliateLinkClicked({
+                      product_id: product.id,
+                      product_name: product.name,
+                      retailer: "Walmart",
+                    })
+                  }
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border/50 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-foreground transition-all duration-300 hover:bg-muted hover:border-accent font-sans"
                 >
                   View Walmart

@@ -30,6 +30,7 @@ from app.models.user import (  # noqa: F401
 from app.models.build import Build, BuildSlot  # noqa: F401
 from app.models.ingestion import IngestionLock, IngestionRun, StampScoreHistory  # noqa: F401
 from app.models.compatibility import CompatibilityResult, ChemistKnownIngredient  # noqa: F401
+from app.models.analytics import AnalyticsEvent  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import type { BeautyProfile } from "@/types";
 
 interface User {
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const data = await api.login(email, password);
     setUser(data.user);
+    analytics.userLogin();
     await syncProfileAfterAuth();
   }, []);
 
@@ -87,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string, displayName?: string) => {
       const data = await api.signup(email, password, displayName);
       setUser(data.user);
+      analytics.accountCreated();
       await syncProfileAfterAuth();
     },
     []
@@ -95,12 +98,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = useCallback(async (idToken: string) => {
     const data = await api.oauthGoogle(idToken);
     setUser(data.user);
+    analytics.userLogin();
     await syncProfileAfterAuth();
   }, []);
 
   const loginWithApple = useCallback(async (idToken: string, appleUser?: object) => {
     const data = await api.oauthApple(idToken, appleUser);
     setUser(data.user);
+    analytics.userLogin();
     await syncProfileAfterAuth();
   }, []);
 
