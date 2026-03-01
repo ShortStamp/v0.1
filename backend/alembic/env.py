@@ -1,5 +1,6 @@
 import asyncio
 from logging.config import fileConfig
+from uuid import uuid4
 
 from alembic import context
 from sqlalchemy import pool
@@ -62,8 +63,13 @@ def do_run_migrations(connection):
 
 
 async def run_async_migrations() -> None:
-    # statement_cache_size=0 required for Supabase Supavisor (transaction-mode pooler)
-    _connect_args = {"ssl": "require", "statement_cache_size": 0} if settings.database_ssl else {}
+    # Supabase Supavisor (transaction-mode pooler): use UUID statement names so each
+    # prepared statement is unique across clients sharing the same server connection.
+    _connect_args = (
+        {"ssl": "require", "statement_cache_size": 0, "prepared_statement_name_func": lambda: f"_s{uuid4().hex}"}
+        if settings.database_ssl
+        else {}
+    )
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
