@@ -107,14 +107,14 @@ export interface BeautyProfile {
 export interface CompatibilityReason {
   agent: string;
   text: string;
-  severity: "warning" | "error";
+  severity: "warning" | "error" | "info";
 }
 
 export interface CompatibilityInfo {
   isCompatible: boolean;
   reason: string;
   reasons: CompatibilityReason[];
-  severity: "warning" | "error";
+  severity: "warning" | "error" | "info";
   sourceAgent: string;
   conflictingProductIds: string[];
   debugTrace: string[];
