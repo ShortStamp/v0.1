@@ -236,6 +236,7 @@ export default function CategoryPage() {
             map[pid] = {
               isCompatible: raw.is_compatible,
               reason: raw.reason,
+              reasons: [],
               severity: raw.severity as "error" | "warning",
               sourceAgent: raw.source_agent,
               conflictingProductIds: raw.conflicting_product_ids ?? [],

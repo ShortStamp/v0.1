@@ -43,9 +43,32 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualInci, setManualInci] = useState("");
+  const [manualName, setManualName] = useState("");
+  const [manualBrand, setManualBrand] = useState("");
 
   // Snapshot of already-built products for conflict name lookup
   const [productCache] = useState(() => readBuildProductCache());
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualName || !manualInci) return;
+
+    const mockProduct: Product = {
+      id: `manual-${Date.now()}`,
+      name: manualName,
+      brand: manualBrand || "My Product",
+      image: "/placeholder-product.jpg",
+      category: categoryKey,
+      stampScore: 0,
+      prices: [],
+      filters: {},
+      inciIngredients: manualInci.split(",").map(i => i.trim()),
+    };
+
+    onSelect(mockProduct);
+  };
 
   // Compatibility state
   const [compatibilityMap, setCompatibilityMap] = useState<CompatibilityMap>({});
@@ -240,6 +263,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
             map[pid] = {
               isCompatible: raw.is_compatible,
               reason: raw.reason,
+              reasons: [],
               severity: raw.severity,
               sourceAgent: raw.source_agent,
               conflictingProductIds: raw.conflicting_product_ids ?? [],
@@ -323,16 +347,80 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent font-sans">Inventory Browser</p>
             <h2 className="text-2xl font-bold font-serif leading-none">Choose {category.label}</h2>
         </div>
-        <button 
-            onClick={onClose} 
-            className="group flex h-10 w-10 items-center justify-center rounded-full bg-muted transition-all hover:bg-accent hover:text-white" 
-            aria-label="Close"
-        >
-          <X className="h-5 w-5 transition-transform group-hover:rotate-90" />
-        </button>
+        <div className="flex items-center gap-4">
+            <button
+                onClick={() => setShowManualEntry(!showManualEntry)}
+                className={`text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-full transition-all font-sans ${showManualEntry ? "bg-accent text-white" : "bg-muted text-foreground/40 hover:bg-muted/80"}`}
+            >
+                {showManualEntry ? "Back to Catalog" : "Add by Ingredients"}
+            </button>
+            <button 
+                onClick={onClose} 
+                className="group flex h-10 w-10 items-center justify-center rounded-full bg-muted transition-all hover:bg-accent hover:text-white" 
+                aria-label="Close"
+            >
+              <X className="h-5 w-5 transition-transform group-hover:rotate-90" />
+            </button>
+        </div>
       </div>
 
-      {/* Search bar + view toggle */}
+      {/* Manual Entry Form */}
+      {showManualEntry ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto">
+            <div className="w-full max-w-xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-bold font-serif text-foreground">Audit Your Kit</h3>
+                    <p className="text-sm text-foreground/40 font-sans">Can&apos;t find your product? Paste the ingredient list (INCI) from the packaging to check for stability and pilling risks.</p>
+                </div>
+
+                <form onSubmit={handleManualSubmit} className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 font-sans px-1">Brand</label>
+                            <input 
+                                type="text"
+                                placeholder="e.g. Rare Beauty"
+                                value={manualBrand}
+                                onChange={e => setManualBrand(e.target.value)}
+                                className="w-full rounded-2xl border border-border/50 bg-white px-5 py-4 text-sm font-medium outline-none focus:border-accent transition-all font-sans"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 font-sans px-1">Product Name</label>
+                            <input 
+                                type="text"
+                                placeholder="e.g. Soft Pinch Blush"
+                                value={manualName}
+                                onChange={e => setManualName(e.target.value)}
+                                required
+                                className="w-full rounded-2xl border border-border/50 bg-white px-5 py-4 text-sm font-medium outline-none focus:border-accent transition-all font-sans"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 font-sans px-1">Ingredients (INCI)</label>
+                        <textarea 
+                            placeholder="Paste ingredient list here (comma separated)..."
+                            value={manualInci}
+                            onChange={e => setManualInci(e.target.value)}
+                            required
+                            className="w-full h-48 rounded-3xl border border-border/50 bg-white px-6 py-5 text-sm font-medium outline-none focus:border-accent transition-all font-sans resize-none"
+                        />
+                    </div>
+
+                    <button 
+                        type="submit"
+                        className="w-full rounded-2xl bg-foreground py-5 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-xl shadow-black/5 hover:bg-accent hover:shadow-accent/20 transition-all font-sans active:scale-[0.98]"
+                    >
+                        Verify Compatibility & Add
+                    </button>
+                </form>
+            </div>
+        </div>
+      ) : (
+        <>
+          {/* Search bar + view toggle */}
       <div className="flex items-center gap-4 border-b border-border/50 bg-white/50 px-8 py-4 backdrop-blur-sm">
         <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/50 bg-white px-5 py-3 shadow-sm transition-all focus-within:border-accent focus-within:shadow-lg focus-within:shadow-accent/5">
           <Search className="h-4 w-4 text-foreground/20" />
@@ -657,6 +745,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
           )}
         </div>
       </div>
+    )}
     </div>
   );
 }
