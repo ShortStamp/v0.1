@@ -354,7 +354,7 @@ class ApiClient {
       description: t.description ?? "",
       direction: t.direction ?? "stable",
       products: [], // Products are fetched separately for a trend
-      videos: t.videos || [],
+      videos: (t.videos || []).map((v) => ({ title: v.title ?? "", url: v.url })),
       articles: t.articles || [],
     }));
   }
@@ -364,13 +364,13 @@ class ApiClient {
     return {
       id: data.id,
       name: data.name,
-      image: data.image,
+      image: data.image ?? "",
       stampScore: data.stamp_score,
-      description: data.description,
-      direction: data.direction,
+      description: data.description ?? "",
+      direction: data.direction ?? "stable",
       products: (data.products || []).map(mapProduct),
-      videos: data.videos,
-      articles: data.articles,
+      videos: (data.videos || []).map((v) => ({ title: v.title ?? "", url: v.url })),
+      articles: data.articles || [],
     };
   }
 
