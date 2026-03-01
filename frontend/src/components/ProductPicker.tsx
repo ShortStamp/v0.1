@@ -745,6 +745,7 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
           )}
         </div>
       </div>
+        </>
     )}
     </div>
   );
