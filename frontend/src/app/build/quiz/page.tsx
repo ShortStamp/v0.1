@@ -438,7 +438,7 @@ export default function QuizPage() {
           <div className="flex flex-col gap-3">
             <button
               onClick={handleSkip}
-              className="w-full rounded-2xl border border-border/50 bg-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] text-foreground transition-all hover:border-accent hover:text-accent font-sans"
+              className="w-full rounded-2xl border-2 border-foreground bg-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] text-foreground transition-all hover:border-accent hover:text-accent font-sans"
             >
               Skip for now &rarr;
             </button>
