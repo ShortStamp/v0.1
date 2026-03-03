@@ -30,8 +30,6 @@ export default function BuildPage() {
   const [hasMounted, setHasMounted] = useState(false);
   const [filledSlots, setFilledSlots] = useState<Record<string, string>>({});
   const [isLoadingQuizRedirect, setIsLoadingQuizRedirect] = useState(false);
-  const [showAllGroups, setShowAllGroups] = useState(false);
-
   useEffect(() => {
     setHasMounted(true);
     setFilledSlots(readBuildSlots());
@@ -64,7 +62,7 @@ export default function BuildPage() {
     );
   }
 
-  const displayedGroups = showAllGroups ? categoryGroups : categoryGroups.filter(g => g.key === "base");
+  const displayedGroups = categoryGroups;
 
   return (
     <div className="min-h-screen bg-background">
@@ -251,23 +249,6 @@ export default function BuildPage() {
           })}
         </div>
 
-        {/* Add Detail drawer toggle */}
-        {!showAllGroups && (
-          <div className="mt-8 flex justify-center">
-            <button
-              onClick={() => setShowAllGroups(true)}
-              className="group flex items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-white/50 px-8 py-6 transition-all hover:border-accent hover:bg-white hover:shadow-xl hover:shadow-accent/5 font-sans"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-accent transition-colors group-hover:bg-accent group-hover:text-white">
-                <ChevronRight className="h-5 w-5 rotate-90" />
-              </div>
-              <div className="text-left">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground">Add Details</p>
-                <p className="text-[10px] text-foreground/40">Eyes, Lips, Brows, and Cheeks</p>
-              </div>
-            </button>
-          </div>
-        )}
 
         {/* Makeup Recipe Card — Sophisticated Final Summary */}
         {recipeCard && !isAnalyzing && (
