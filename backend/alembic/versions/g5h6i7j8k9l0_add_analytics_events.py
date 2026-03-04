@@ -7,6 +7,7 @@ Create Date: 2026-03-01 00:00:00.000000
 """
 from typing import Sequence, Union
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -17,31 +18,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute(
-        """
-        CREATE TABLE analytics_events (
-            id            BIGSERIAL PRIMARY KEY,
-            anonymous_id  VARCHAR(36)  NOT NULL,
-            user_id       VARCHAR(36)  NULL,
-            event_name    VARCHAR(100) NOT NULL,
-            properties    JSONB        NOT NULL DEFAULT '{}',
-            session_id    VARCHAR(36)  NOT NULL,
-            occurred_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-        )
-        """
+    op.create_table(
+        "analytics_events",
+        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
+        sa.Column("anonymous_id", sa.String(36), nullable=False),
+        sa.Column("user_id", sa.String(36), nullable=True),
+        sa.Column("event_name", sa.String(100), nullable=False),
+        sa.Column("properties", sa.Text(), nullable=False, server_default="{}"),
+        sa.Column("session_id", sa.String(36), nullable=False),
+        sa.Column(
+            "occurred_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
     )
-    op.execute(
-        "CREATE INDEX ix_analytics_events_occurred_at   ON analytics_events (occurred_at DESC)"
-    )
-    op.execute(
-        "CREATE INDEX ix_analytics_events_name_occurred ON analytics_events (event_name, occurred_at DESC)"
-    )
-    op.execute(
-        "CREATE INDEX ix_analytics_events_user_id       ON analytics_events (user_id) WHERE user_id IS NOT NULL"
-    )
-    op.execute(
-        "CREATE INDEX ix_analytics_events_anon_id       ON analytics_events (anonymous_id, occurred_at DESC)"
-    )
+    op.create_index("ix_analytics_events_occurred_at", "analytics_events", ["occurred_at"])
+    op.create_index("ix_analytics_events_name_occurred", "analytics_events", ["event_name", "occurred_at"])
+    op.create_index("ix_analytics_events_user_id", "analytics_events", ["user_id"])
+    op.create_index("ix_analytics_events_anon_id", "analytics_events", ["anonymous_id", "occurred_at"])
 
 
 def downgrade() -> None:

@@ -32,40 +32,40 @@ def upgrade() -> None:
             "reasons",
             sa.JSON(),
             nullable=True,
-            server_default=sa.text("'[]'::json"),
+            server_default=sa.text("'[]'"),
         ),
     )
 
-    # 2. Reset every out-of-sync integer/bigint PK sequence in the public schema.
-    #    Safe to run even if sequences are already correct — setval() is idempotent.
-    op.execute(
-        """
-        DO $$
-        DECLARE
-            r        RECORD;
-            max_id   BIGINT;
-            seq_name TEXT;
-        BEGIN
-            FOR r IN
-                SELECT c.table_name
-                FROM information_schema.columns c
-                WHERE c.column_name   = 'id'
-                  AND c.table_schema  = 'public'
-                  AND c.data_type    IN ('integer', 'bigint')
-            LOOP
-                seq_name := pg_get_serial_sequence(r.table_name, 'id');
-                IF seq_name IS NOT NULL THEN
-                    EXECUTE format(
-                        'SELECT COALESCE(MAX(id), 0) FROM %I', r.table_name
-                    ) INTO max_id;
-                    -- setval(seq, val) sets next value to val+1 by default
-                    PERFORM setval(seq_name, GREATEST(max_id, 1));
-                END IF;
-            END LOOP;
-        END;
-        $$;
-        """
-    )
+    # 2. Reset out-of-sync PK sequences (PostgreSQL only — SQLite uses AUTOINCREMENT)
+    bind = op.get_bind()
+    if bind.dialect.name != "sqlite":
+        op.execute(
+            """
+            DO $$
+            DECLARE
+                r        RECORD;
+                max_id   BIGINT;
+                seq_name TEXT;
+            BEGIN
+                FOR r IN
+                    SELECT c.table_name
+                    FROM information_schema.columns c
+                    WHERE c.column_name   = 'id'
+                      AND c.table_schema  = 'public'
+                      AND c.data_type    IN ('integer', 'bigint')
+                LOOP
+                    seq_name := pg_get_serial_sequence(r.table_name, 'id');
+                    IF seq_name IS NOT NULL THEN
+                        EXECUTE format(
+                            'SELECT COALESCE(MAX(id), 0) FROM %I', r.table_name
+                        ) INTO max_id;
+                        PERFORM setval(seq_name, GREATEST(max_id, 1));
+                    END IF;
+                END LOOP;
+            END;
+            $$;
+            """
+        )
 
 
 def downgrade() -> None:

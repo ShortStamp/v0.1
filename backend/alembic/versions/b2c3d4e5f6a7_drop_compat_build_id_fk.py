@@ -21,20 +21,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Drop the FK constraint (PostgreSQL auto-named it)
-    op.drop_constraint(
-        "compatibility_results_build_id_fkey",
-        "compatibility_results",
-        type_="foreignkey",
-    )
-    # Widen column to 100 chars and make nullable
-    op.alter_column(
-        "compatibility_results",
-        "build_id",
-        existing_type=sa.String(36),
-        type_=sa.String(100),
-        nullable=True,
-    )
+    bind = op.get_bind()
+    is_sqlite = bind.dialect.name == "sqlite"
+
+    with op.batch_alter_table("compatibility_results") as batch_op:
+        # The FK was auto-named by PostgreSQL; SQLite never created a named constraint
+        if not is_sqlite:
+            batch_op.drop_constraint(
+                "compatibility_results_build_id_fkey",
+                type_="foreignkey",
+            )
+        # Widen column to 100 chars and make nullable
+        batch_op.alter_column(
+            "build_id",
+            existing_type=sa.String(36),
+            type_=sa.String(100),
+            nullable=True,
+        )
 
 
 def downgrade() -> None:
