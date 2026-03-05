@@ -141,8 +141,8 @@ export default function BuildPage() {
           {/* Header */}
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">What do you already own?</span>
-              <span className="text-[10px] text-foreground/30 font-sans">— we&apos;ll flag conflicts as you browse</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground font-sans">What do you already own?</span>
+              <span className="text-[10px] text-foreground/50 font-sans">— we&apos;ll flag conflicts as you browse</span>
             </div>
             {ownedProducts.length > 0 && (
               <div className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40 font-sans">
