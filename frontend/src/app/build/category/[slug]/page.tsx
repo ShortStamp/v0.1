@@ -188,10 +188,13 @@ export default function CategoryPage() {
   useEffect(() => {
     if (compatTimerRef.current) clearTimeout(compatTimerRef.current);
 
-    const existingIds = Object.entries(readBuildSlots())
-      .filter(([cat]) => cat !== categoryKey)
-      .map(([, id]) => id)
-      .filter(Boolean);
+    const existingIds = [
+      ...Object.entries(readBuildSlots())
+        .filter(([cat]) => cat !== categoryKey)
+        .map(([, id]) => id)
+        .filter(Boolean),
+      ...Array.from(ownedProductIds),
+    ];
 
     const candidateIds = candidateIdsKey ? candidateIdsKey.split(",") : [];
     const allIds = [...new Set([...existingIds, ...candidateIds])];
