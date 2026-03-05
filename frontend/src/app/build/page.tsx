@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Search,
   X,
+  ArrowDown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -256,6 +257,18 @@ export default function BuildPage() {
               <p className="mt-1 text-[11px] text-foreground/30 font-sans">Products you add here are checked for conflicts as you build your kit</p>
             </div>
           )}
+        </div>
+
+        {/* Divider: owned → new */}
+        <div className="mb-10 flex items-center gap-6">
+          <div className="h-px flex-1 bg-border/50" />
+          <div className="flex items-center gap-3 rounded-full border border-border/60 bg-white px-5 py-2.5 shadow-sm">
+            <ArrowDown className="h-4 w-4 text-foreground/40" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/60 font-sans">
+              Add new products to your kit
+            </span>
+          </div>
+          <div className="h-px flex-1 bg-border/50" />
         </div>
 
         {/* Face area group tiles */}
