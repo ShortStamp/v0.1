@@ -45,6 +45,7 @@ export default function BuildPage() {
   const [kitSearchOpen, setKitSearchOpen] = useState(false);
   const kitDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const kitRef = useRef<HTMLDivElement>(null);
+  const tilesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -253,17 +254,20 @@ export default function BuildPage() {
         {/* Divider: owned → new */}
         <div className="mb-8 flex items-center gap-6">
           <div className="h-px flex-1 bg-border/50" />
-          <div className="flex items-center gap-3 rounded-full border border-border/60 bg-white px-5 py-2.5 shadow-sm">
+          <button
+            onClick={() => tilesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="flex items-center gap-3 rounded-full border border-border/60 bg-white px-5 py-2.5 shadow-sm transition-all hover:border-foreground hover:shadow-md"
+          >
             <ArrowDown className="h-4 w-4 text-foreground/40" />
             <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/60 font-sans">
               Add new products to your kit
             </span>
-          </div>
+          </button>
           <div className="h-px flex-1 bg-border/50" />
         </div>
 
         {/* Face area group tiles */}
-        <div className="flex flex-wrap justify-center gap-6">
+        <div ref={tilesRef} className="flex flex-wrap justify-center gap-6">
           {displayedGroups.map((group) => {
             const Icon = groupIcons[group.key] ?? Circle;
             const filled = group.categories.filter(
