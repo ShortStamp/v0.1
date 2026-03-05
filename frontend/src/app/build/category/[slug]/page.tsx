@@ -34,6 +34,7 @@ export default function CategoryPage() {
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("tiles");
+  const [sort, setSort] = useState("stamp_score_desc");
   const [hasQuizFilters, setHasQuizFilters] = useState(false);
 
   // Snapshot of already-built products for conflict name lookup
@@ -80,13 +81,13 @@ export default function CategoryPage() {
     setActiveFilters((prev) => (Object.keys(prev).length > 0 ? prev : defaults));
   }, [category]);
 
-  // Reset pagination whenever search/filters/category change
+  // Reset pagination whenever search/filters/category/sort change
   useEffect(() => {
     setPage(1);
     setProducts([]);
     setHasMore(true);
     setLoadError(false);
-  }, [categoryKey, search, activeFilters]);
+  }, [categoryKey, search, activeFilters, sort]);
 
   // Fetch products — appends on page > 1, replaces on page === 1
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function CategoryPage() {
           category: categoryKey,
           search: search || undefined,
           filters,
+          sort,
           page,
           per_page: PER_PAGE,
         });
@@ -124,6 +126,7 @@ export default function CategoryPage() {
             category: categoryKey,
             search: search || undefined,
             filters: brandOnly,
+            sort,
             page: 1,
             per_page: PER_PAGE,
           });
@@ -154,7 +157,7 @@ export default function CategoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [categoryKey, search, activeFilters, page]);
+  }, [categoryKey, search, activeFilters, sort, page]);
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
@@ -363,7 +366,19 @@ export default function CategoryPage() {
             className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-foreground/30 font-sans"
           />
         </div>
-        
+
+        {/* Sort dropdown */}
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="h-11 rounded-2xl border border-border/50 bg-white px-4 text-[11px] font-bold uppercase tracking-[0.15em] text-foreground shadow-sm outline-none transition-all hover:border-accent focus:border-accent font-sans cursor-pointer"
+          aria-label="Sort products"
+        >
+          <option value="stamp_score_desc">Best Match</option>
+          <option value="price_asc">Best Price</option>
+          <option value="name_asc">A–Z</option>
+        </select>
+
         {isAnalyzing && (
           <div className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 animate-pulse">
             <span className="text-[10px] font-bold uppercase tracking-widest text-accent/50 font-sans">

@@ -93,6 +93,22 @@ def _clean_product_name(value: str) -> str:
     return cleaned[:300]
 
 
+def _parse_ingredient_string(raw: str) -> list[str] | None:
+    """Parse a raw ingredient description string into a cleaned list.
+
+    Handles comma-separated INCI lists, HTML tags, bullet characters, and
+    parenthetical notes.  Returns None if fewer than 2 ingredients found.
+    """
+    # Strip HTML tags and decode entities
+    cleaned = unescape(raw)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    # Replace common non-comma separators with commas
+    cleaned = re.sub(r"[•·\n\r\t]+", ",", cleaned)
+    parts = [p.strip().strip(".,;:•·") for p in cleaned.split(",")]
+    ingredients = [p for p in parts if p and len(p) > 1]
+    return ingredients if len(ingredients) >= 2 else None
+
+
 def _looks_low_quality_name(name: str) -> bool:
     if not name:
         return True

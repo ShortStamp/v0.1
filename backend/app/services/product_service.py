@@ -295,6 +295,17 @@ async def list_products(
         query = query.order_by(Product.name.asc())
     elif sort == "name_desc":
         query = query.order_by(Product.name.desc())
+    elif sort in ("price_asc", "price_desc"):
+        min_price_sq = (
+            sa_select(func.min(ProductPrice.price))
+            .where(ProductPrice.product_id == Product.id)
+            .correlate(Product)
+            .scalar_subquery()
+        )
+        if sort == "price_asc":
+            query = query.order_by(min_price_sq.asc().nulls_last())
+        else:
+            query = query.order_by(min_price_sq.desc().nulls_first())
     else:
         query = query.order_by(Product.stamp_score.desc())
 
