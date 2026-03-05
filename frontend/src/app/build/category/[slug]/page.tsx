@@ -6,6 +6,7 @@ import { CategoryKey, Product, CategoryDefinition, CompatibilityMap } from "@/ty
 import { categoryMap } from "@/lib/data";
 import { api } from "@/lib/api";
 import { readBuildSlots, saveBuildSlot, saveBuildProductToCache, readBuildProductCache } from "@/lib/buildSlots";
+import { readOwnedProducts } from "@/lib/ownedProducts";
 import { analytics } from "@/lib/analytics";
 import { getQuizAutoFilters } from "@/lib/personalization";
 import Link from "next/link";
@@ -39,6 +40,9 @@ export default function CategoryPage() {
 
   // Snapshot of already-built products for conflict name lookup
   const [productCache] = useState(() => readBuildProductCache());
+
+  // Owned product IDs for "IN MY KIT" badge
+  const [ownedProductIds] = useState<Set<string>>(() => new Set(readOwnedProducts().map((o) => o.id)));
 
   // Compatibility state
   const [compatibilityMap, setCompatibilityMap] = useState<CompatibilityMap>({});
@@ -516,6 +520,9 @@ export default function CategoryPage() {
 
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         {/* ChemAI compatibility badges */}
+                                        {ownedProductIds.has(product.id) && (
+                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-neutral-500 border border-neutral-200 font-sans">In My Kit</span>
+                                        )}
                                         {isCompatible && (
                                             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-green-600 border border-green-100 font-sans transition-all duration-500 group-hover:bg-green-100">✓ Compatible</span>
                                         )}
@@ -593,6 +600,9 @@ export default function CategoryPage() {
                             
                             {/* Compatibility Overlays */}
                             <div className="absolute inset-x-2 top-2 z-10 flex flex-col gap-1">
+                                {ownedProductIds.has(product.id) && (
+                                    <div className="animate-slide-in rounded-full bg-neutral-100/90 px-2 py-1 text-[7px] font-bold uppercase tracking-widest text-neutral-500 border border-neutral-200 backdrop-blur-sm shadow-sm">In My Kit</div>
+                                )}
                                 {isCompatible && (
                                     <div className="animate-slide-in rounded-full bg-green-50/90 px-2 py-1 text-[7px] font-bold uppercase tracking-widest text-green-600 border border-green-100 backdrop-blur-sm shadow-sm">✓ Compatible</div>
                                 )}

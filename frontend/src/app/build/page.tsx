@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { categoryGroups } from "@/lib/data";
 import { readBuildSlots } from "@/lib/buildSlots";
 import { useCompatibility } from "@/lib/useCompatibility";
 import { MakeupRecipeCard } from "@/components/MakeupRecipeCard";
+import { readOwnedProducts, addOwnedProduct, removeOwnedProduct, type OwnedProduct } from "@/lib/ownedProducts";
+import { api } from "@/lib/api";
+import type { Product } from "@/types";
+import { getDisplayName, getDisplayBrand } from "@/lib/pricing";
 import {
   Droplets,
   Eye,
@@ -14,6 +18,8 @@ import {
   Heart,
   Circle,
   ChevronRight,
+  Search,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,10 +36,20 @@ export default function BuildPage() {
   const [hasMounted, setHasMounted] = useState(false);
   const [filledSlots, setFilledSlots] = useState<Record<string, string>>({});
   const [isLoadingQuizRedirect, setIsLoadingQuizRedirect] = useState(false);
+
+  // My Kit state
+  const [ownedProducts, setOwnedProducts] = useState<OwnedProduct[]>([]);
+  const [kitSearch, setKitSearch] = useState("");
+  const [kitResults, setKitResults] = useState<Product[]>([]);
+  const [kitSearchOpen, setKitSearchOpen] = useState(false);
+  const kitDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const kitRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setHasMounted(true);
     setFilledSlots(readBuildSlots());
-    
+    setOwnedProducts(readOwnedProducts());
+
     const saved = localStorage.getItem("beautyProfile");
     if (!saved) {
       setIsLoadingQuizRedirect(true);
@@ -42,14 +58,40 @@ export default function BuildPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded, recipeCard, overallScore } = useCompatibility(filledSlots);
+  // Debounced kit search
+  useEffect(() => {
+    if (kitDebounceRef.current) clearTimeout(kitDebounceRef.current);
+    if (kitSearch.length < 2) {
+      setKitResults([]);
+      setKitSearchOpen(false);
+      return;
+    }
+    kitDebounceRef.current = setTimeout(async () => {
+      try {
+        const data = await api.getProducts({ search: kitSearch, per_page: 6 });
+        setKitResults(data.items);
+        setKitSearchOpen(true);
+      } catch {
+        setKitResults([]);
+      }
+    }, 300);
+    return () => {
+      if (kitDebounceRef.current) clearTimeout(kitDebounceRef.current);
+    };
+  }, [kitSearch]);
 
-  // Core Face progress: Focus on the "Base" group categories
-  const baseGroup = categoryGroups.find(g => g.key === "base");
-  const coreCategories = baseGroup ? baseGroup.categories : [];
-  const coreFilled = coreCategories.filter(cat => filledSlots[cat]).length;
-  const coreTotal = coreCategories.length;
-  const coreProgress = Math.round(coreTotal > 0 ? (coreFilled / coreTotal) * 100 : 0);
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (kitRef.current && !kitRef.current.contains(e.target as Node)) {
+        setKitSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const { compatibilityMap, analyzedIds, isAnalyzing, quotaExceeded, recipeCard, overallScore } = useCompatibility(filledSlots);
 
   const totalCategories = categoryGroups.reduce((sum, g) => sum + g.categories.length, 0);
   const totalFilled = hasMounted ? Object.keys(filledSlots).length : 0;
@@ -93,32 +135,111 @@ export default function BuildPage() {
           </div>
         </div>
 
-        {/* Core Face progress */}
+        {/* My Kit */}
         <div className="mb-16 rounded-3xl bg-white p-8 shadow-xl shadow-accent/5 border border-border/50">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">
-                Core Face Readiness
-              </span>
-              <p className="text-2xl font-bold font-sans">
-                {coreProgress}% <span className="text-sm font-medium text-foreground/40 font-sans">{coreProgress === 100 ? "Ready for Analysis" : "Complete"}</span>
-              </p>
+          <span className="mb-4 block text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">
+            My Kit
+          </span>
+
+          {/* Search input + dropdown */}
+          <div ref={kitRef} className="relative mb-6">
+            <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-white px-5 py-3 shadow-sm transition-all focus-within:border-accent focus-within:shadow-lg focus-within:shadow-accent/5">
+              <Search className="h-4 w-4 shrink-0 text-foreground/20" />
+              <input
+                type="text"
+                placeholder="Search products you already own..."
+                value={kitSearch}
+                onChange={(e) => setKitSearch(e.target.value)}
+                onFocus={() => kitResults.length > 0 && setKitSearchOpen(true)}
+                className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-foreground/30 font-sans"
+              />
             </div>
-            <div className="text-right">
-               <span className="text-sm font-bold font-sans text-accent">
-                {coreFilled} <span className="text-foreground/20">/</span> {coreTotal} <span className="text-[10px] uppercase text-foreground/20 ml-1">Core items</span>
-              </span>
+
+            {kitSearchOpen && kitResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border/50 bg-white shadow-xl shadow-black/10">
+                {kitResults.map((product) => {
+                  const alreadyOwned = ownedProducts.some((o) => o.id === product.id);
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => {
+                        if (!alreadyOwned) {
+                          const owned: OwnedProduct = {
+                            id: product.id,
+                            name: getDisplayName(product.name),
+                            brand: getDisplayBrand(product.brand),
+                            image: product.image ?? "",
+                          };
+                          addOwnedProduct(owned);
+                          setOwnedProducts(readOwnedProducts());
+                        }
+                        setKitSearch("");
+                        setKitSearchOpen(false);
+                      }}
+                      className="flex w-full items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+                      disabled={alreadyOwned}
+                    >
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-muted p-1">
+                        <img
+                          // eslint-disable-next-line @next/next/no-img-element
+                          src={product.image || "/placeholder-product.jpg"}
+                          alt={getDisplayName(product.name)}
+                          className="h-full w-full object-contain"
+                          onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-accent font-sans">{getDisplayBrand(product.brand)}</p>
+                        <p className="truncate text-sm font-semibold font-sans text-foreground">{getDisplayName(product.name)}</p>
+                      </div>
+                      {alreadyOwned ? (
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-foreground/30 font-sans">In Kit</span>
+                      ) : (
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-accent font-sans">+ Add</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Owned chips */}
+          {ownedProducts.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {ownedProducts.map((o) => (
+                <div
+                  key={o.id}
+                  className="flex items-center gap-2 rounded-full border border-border/50 bg-muted px-3 py-1.5"
+                >
+                  <div className="h-5 w-5 shrink-0 overflow-hidden rounded-full bg-white">
+                    <img
+                      // eslint-disable-next-line @next/next/no-img-element
+                      src={o.image || "/placeholder-product.jpg"}
+                      alt={o.name}
+                      className="h-full w-full object-contain"
+                      onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
+                    />
+                  </div>
+                  <span className="max-w-[120px] truncate text-[10px] font-bold font-sans text-foreground/70">
+                    {o.name}
+                  </span>
+                  <button
+                    onClick={() => {
+                      removeOwnedProduct(o.id);
+                      setOwnedProducts(readOwnedProducts());
+                    }}
+                    className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-foreground/30 transition-colors hover:bg-foreground/10 hover:text-foreground"
+                    aria-label={`Remove ${o.name}`}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-accent transition-all duration-700 ease-out"
-              style={{ width: `${coreProgress}%` }}
-            />
-          </div>
-          {coreProgress < 100 && (
-            <p className="mt-4 text-[10px] text-foreground/40 italic font-sans">
-              Tip: Add a Primer, Foundation, and Setting Powder to see full stability insights.
+          ) : (
+            <p className="text-[11px] text-foreground/30 italic font-sans">
+              Search for products you already own to track what&apos;s in your kit
             </p>
           )}
         </div>
