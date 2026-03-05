@@ -137,25 +137,24 @@ export default function BuildPage() {
         </div>
 
         {/* My Kit */}
-        <div className="mb-16 rounded-3xl bg-white p-8 shadow-xl shadow-accent/5 border border-border/50">
+        <div className="mb-8 rounded-2xl bg-white px-6 py-5 shadow-md shadow-accent/5 border border-border/50">
           {/* Header */}
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">Step 0</p>
-              <h2 className="text-2xl font-bold font-serif leading-tight">What do you already own?</h2>
-              <p className="mt-1.5 text-sm text-foreground/50 font-sans">
-                Add products already in your collection. We&apos;ll flag conflicts with new products you browse.
-              </p>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/30 font-sans">What do you already own?</span>
+              <span className="text-[10px] text-foreground/30 font-sans">— we&apos;ll flag conflicts as you browse</span>
             </div>
-            <div className="shrink-0 rounded-2xl bg-muted px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40 font-sans">
-              {ownedProducts.length} owned
-            </div>
+            {ownedProducts.length > 0 && (
+              <div className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40 font-sans">
+                {ownedProducts.length} owned
+              </div>
+            )}
           </div>
 
           {/* Search input + dropdown */}
-          <div ref={kitRef} className="relative mb-6">
-            <div className="flex items-center gap-3 rounded-2xl border-2 border-border/60 bg-white px-5 py-4 shadow-sm transition-all focus-within:border-foreground focus-within:shadow-md">
-              <Search className="h-5 w-5 shrink-0 text-foreground/40" />
+          <div ref={kitRef} className="relative mb-3">
+            <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-white px-4 py-2.5 shadow-sm transition-all focus-within:border-foreground">
+              <Search className="h-4 w-4 shrink-0 text-foreground/30" />
               <input
                 type="text"
                 placeholder="Search your existing products — e.g. MAC Studio Fix, NARS Concealer..."
@@ -216,10 +215,8 @@ export default function BuildPage() {
           </div>
 
           {/* Owned chips */}
-          {ownedProducts.length > 0 ? (
-            <>
-              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/30 font-sans">Already owned</p>
-              <div className="flex flex-wrap gap-2">
+          {ownedProducts.length > 0 && (
+            <div className="flex flex-wrap gap-2">
               {ownedProducts.map((o) => (
                 <div
                   key={o.id}
@@ -250,17 +247,11 @@ export default function BuildPage() {
                 </div>
               ))}
             </div>
-            </>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border/60 bg-muted/30 px-6 py-5 text-center">
-              <p className="text-sm font-semibold text-foreground/40 font-sans">No products added yet</p>
-              <p className="mt-1 text-[11px] text-foreground/30 font-sans">Products you add here are checked for conflicts as you build your kit</p>
-            </div>
           )}
         </div>
 
         {/* Divider: owned → new */}
-        <div className="mb-10 flex items-center gap-6">
+        <div className="mb-8 flex items-center gap-6">
           <div className="h-px flex-1 bg-border/50" />
           <div className="flex items-center gap-3 rounded-full border border-border/60 bg-white px-5 py-2.5 shadow-sm">
             <ArrowDown className="h-4 w-4 text-foreground/40" />
