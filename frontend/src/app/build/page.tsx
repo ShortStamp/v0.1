@@ -10,7 +10,7 @@ import { MakeupRecipeCard } from "@/components/MakeupRecipeCard";
 import { readOwnedProducts, addOwnedProduct, removeOwnedProduct, type OwnedProduct } from "@/lib/ownedProducts";
 import { api } from "@/lib/api";
 import type { Product } from "@/types";
-import { getDisplayName, getDisplayBrand } from "@/lib/pricing";
+import { getDisplayName, getDisplayBrand, getBestOfferForProduct } from "@/lib/pricing";
 import {
   Droplets,
   Eye,
@@ -21,6 +21,7 @@ import {
   Search,
   X,
   ArrowDown,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -180,6 +181,7 @@ export default function BuildPage() {
                             name: getDisplayName(product.name),
                             brand: getDisplayBrand(product.brand),
                             image: product.image ?? "",
+                            offerUrl: getBestOfferForProduct(product)?.url,
                           };
                           addOwnedProduct(owned);
                           setOwnedProducts(readOwnedProducts());
@@ -217,37 +219,63 @@ export default function BuildPage() {
 
           {/* Owned chips */}
           {ownedProducts.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {ownedProducts.map((o) => (
-                <div
-                  key={o.id}
-                  className="flex items-center gap-2 rounded-full border border-border/50 bg-muted px-3 py-1.5"
-                >
-                  <div className="h-5 w-5 shrink-0 overflow-hidden rounded-full bg-white">
-                    <img
-                      // eslint-disable-next-line @next/next/no-img-element
-                      src={o.image || "/placeholder-product.jpg"}
-                      alt={o.name}
-                      className="h-full w-full object-contain"
-                      onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
-                    />
-                  </div>
-                  <span className="max-w-[120px] truncate text-[10px] font-bold font-sans text-foreground/70">
-                    {o.name}
-                  </span>
-                  <button
-                    onClick={() => {
-                      removeOwnedProduct(o.id);
-                      setOwnedProducts(readOwnedProducts());
-                    }}
-                    className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-foreground/30 transition-colors hover:bg-foreground/10 hover:text-foreground"
-                    aria-label={`Remove ${o.name}`}
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="flex flex-wrap gap-2">
+                {ownedProducts.map((o) => {
+                  const buyUrl = o.offerUrl || `/product/${o.id}`;
+                  return (
+                    <div
+                      key={o.id}
+                      className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted pl-2 pr-1 py-1"
+                    >
+                      <div className="h-5 w-5 shrink-0 overflow-hidden rounded-full bg-white">
+                        <img
+                          // eslint-disable-next-line @next/next/no-img-element
+                          src={o.image || "/placeholder-product.jpg"}
+                          alt={o.name}
+                          className="h-full w-full object-contain"
+                          onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
+                        />
+                      </div>
+                      <span className="max-w-[100px] truncate text-[10px] font-bold font-sans text-foreground/70">
+                        {o.name}
+                      </span>
+                      <a
+                        href={buyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground text-white transition-colors hover:bg-accent"
+                        title={`Buy ${o.name}`}
+                      >
+                        <ShoppingBag className="h-2.5 w-2.5" />
+                      </a>
+                      <button
+                        onClick={() => {
+                          removeOwnedProduct(o.id);
+                          setOwnedProducts(readOwnedProducts());
+                        }}
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-foreground/30 transition-colors hover:bg-foreground/10 hover:text-foreground"
+                        aria-label={`Remove ${o.name}`}
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Buy All */}
+              <button
+                onClick={() => {
+                  ownedProducts.forEach((o) => {
+                    window.open(o.offerUrl || `/product/${o.id}`, "_blank");
+                  });
+                }}
+                className="mt-3 flex items-center gap-2 rounded-full bg-foreground px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition-colors hover:bg-accent font-sans"
+              >
+                <ShoppingBag className="h-3 w-3" />
+                Buy All ({ownedProducts.length})
+              </button>
+            </>
           )}
         </div>
 

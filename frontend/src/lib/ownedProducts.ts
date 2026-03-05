@@ -3,6 +3,7 @@ export type OwnedProduct = {
   name: string;
   brand: string;
   image: string;
+  offerUrl?: string;
 };
 
 const KEY = "ownedProducts";
