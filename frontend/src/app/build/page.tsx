@@ -47,6 +47,8 @@ export default function BuildPage() {
   const kitDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const kitRef = useRef<HTMLDivElement>(null);
   const tilesRef = useRef<HTMLDivElement>(null);
+  const [buyAllOpen, setBuyAllOpen] = useState(false);
+  const buyAllRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -83,11 +85,14 @@ export default function BuildPage() {
     };
   }, [kitSearch]);
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (kitRef.current && !kitRef.current.contains(e.target as Node)) {
         setKitSearchOpen(false);
+      }
+      if (buyAllRef.current && !buyAllRef.current.contains(e.target as Node)) {
+        setBuyAllOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -263,18 +268,48 @@ export default function BuildPage() {
                   );
                 })}
               </div>
-              {/* Buy All */}
-              <button
-                onClick={() => {
-                  ownedProducts.forEach((o) => {
-                    window.open(o.offerUrl || `/product/${o.id}`, "_blank");
-                  });
-                }}
-                className="mt-3 flex items-center gap-2 rounded-full bg-foreground px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition-colors hover:bg-accent font-sans"
-              >
-                <ShoppingBag className="h-3 w-3" />
-                Buy All ({ownedProducts.length})
-              </button>
+              {/* Buy All dropdown */}
+              <div ref={buyAllRef} className="relative mt-3 inline-block">
+                <button
+                  onClick={() => setBuyAllOpen((v) => !v)}
+                  className="flex items-center gap-2 rounded-full bg-foreground px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition-colors hover:bg-accent font-sans"
+                >
+                  <ShoppingBag className="h-3 w-3" />
+                  Buy All ({ownedProducts.length})
+                </button>
+
+                {buyAllOpen && (
+                  <div className="absolute left-0 top-full z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-border/50 bg-white shadow-xl shadow-black/10">
+                    <p className="border-b border-border/30 px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] text-foreground/40 font-sans">
+                      Buy individually
+                    </p>
+                    {ownedProducts.map((o) => (
+                      <a
+                        key={o.id}
+                        href={o.offerUrl || `/product/${o.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-muted p-1">
+                          <img
+                            // eslint-disable-next-line @next/next/no-img-element
+                            src={o.image || "/placeholder-product.jpg"}
+                            alt={o.name}
+                            className="h-full w-full object-contain"
+                            onError={(e) => { e.currentTarget.src = "/placeholder-product.jpg"; }}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-accent font-sans">{o.brand}</p>
+                          <p className="truncate text-xs font-semibold text-foreground font-sans">{o.name}</p>
+                        </div>
+                        <ShoppingBag className="h-3.5 w-3.5 shrink-0 text-foreground/30" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
