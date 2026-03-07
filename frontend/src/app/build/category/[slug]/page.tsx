@@ -202,13 +202,6 @@ export default function CategoryPage() {
     const candidateIds = candidateIdsKey ? candidateIdsKey.split(",") : [];
     const allIds = [...new Set([...existingIds, ...candidateIds])];
 
-    if (existingIds.length === 0 || candidateIds.length === 0 || allIds.length < 2) {
-      setCompatibilityMap({});
-      setAnalyzedCandidateIds(new Set());
-      setQuotaExceeded(false);
-      return;
-    }
-
     // Read beauty profile from localStorage for Artist Agent analysis
     const storedProfile = (() => {
       try {
@@ -225,6 +218,14 @@ export default function CategoryPage() {
         };
       } catch { return null; }
     })();
+
+    // Skip only if there's nothing to analyze against (no kit items AND no quiz profile)
+    if (candidateIds.length === 0 || (existingIds.length === 0 && !storedProfile)) {
+      setCompatibilityMap({});
+      setAnalyzedCandidateIds(new Set());
+      setQuotaExceeded(false);
+      return;
+    }
 
     compatTimerRef.current = setTimeout(() => {
       let cancelled = false;
@@ -287,7 +288,16 @@ export default function CategoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateIdsKey, categoryKey]);
 
-  const filtered = useMemo(() => products, [products]);
+  const filtered = useMemo(() => {
+    if (analyzedCandidateIds.size === 0) return products;
+    return [...products].sort((a, b) => {
+      const aConflict = compatibilityMap[a.id] && !compatibilityMap[a.id].isCompatible;
+      const bConflict = compatibilityMap[b.id] && !compatibilityMap[b.id].isCompatible;
+      if (aConflict && !bConflict) return 1;
+      if (!aConflict && bConflict) return -1;
+      return 0;
+    });
+  }, [products, analyzedCandidateIds, compatibilityMap]);
 
   const displayedFilters = useMemo(() => {
     if (!category) return [];
@@ -504,7 +514,7 @@ export default function CategoryPage() {
                             const compat = compatibilityMap[product.id];
                             const hasConflict = !quotaExceeded && compat && !compat.isCompatible;
                             const isError = hasConflict && compat.severity === "error";
-                            const isCompatible = !quotaExceeded && !isAnalyzing && analyzedCandidateIds.has(product.id) && !compat;
+                            const isCompatible = !quotaExceeded && !isAnalyzing && analyzedCandidateIds.size > 0 && !hasConflict;
                             return (
                             <tr key={product.id} className="group transition-all duration-500 ease-out hover:bg-muted/40">
                                 <td className="py-6 pl-4">
@@ -583,7 +593,7 @@ export default function CategoryPage() {
                       const compat = compatibilityMap[product.id];
                       const hasConflict = !quotaExceeded && compat && !compat.isCompatible;
                       const isError = hasConflict && compat.severity === "error";
-                      const isCompatible = !quotaExceeded && !isAnalyzing && analyzedCandidateIds.has(product.id) && !compat;
+                      const isCompatible = !quotaExceeded && !isAnalyzing && analyzedCandidateIds.size > 0 && !hasConflict;
                       return (
                         <div
                           key={product.id}

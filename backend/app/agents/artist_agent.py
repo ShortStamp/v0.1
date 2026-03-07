@@ -289,15 +289,22 @@ def _run_glow_check(
     if not glow_products:
         return results
 
-    total = sum(_compute_glow_score(p) for p in glow_products)
-    
+    # Count only the highest glow score per category (one product per slot)
+    by_category: dict[str, tuple[ProductSnapshot, float]] = {}
+    for p in glow_products:
+        s = _compute_glow_score(p)
+        if p.category not in by_category or s > by_category[p.category][1]:
+            by_category[p.category] = (p, s)
+
+    total = sum(s for _, s in by_category.values())
+
     skin_type = (profile.skin_type or "").lower()
     threshold = 10 if skin_type == "oily" else 12
 
     if total > threshold:
-        all_ids = [p.id for p in glow_products]
-        for p in glow_products:
-            others = [pid for pid in all_ids if pid != p.id]
+        flagged_ids = [p.id for p, _ in by_category.values()]
+        for p, _ in by_category.values():
+            others = [pid for pid in flagged_ids if pid != p.id]
             msg = (
                 f"Visual Stability Risk: Your build has reached a 'Glow Overload' ({total}/15). "
                 "While each product is beautiful, stacking this much luminosity can make the skin "
@@ -408,17 +415,27 @@ def _run_visual_weight_check(
             return _POWDER_DEFAULT_WEIGHT
         return 3  # medium fallback for foundation/concealer
 
-    total = sum(_weight(p) for p in base_products)
+    # Only count the heaviest product per category — you wear one foundation,
+    # one concealer, one primer, etc. Multiple candidates in the same category
+    # must not stack against each other.
+    by_category: dict[str, tuple[ProductSnapshot, int]] = {}
+    for p in base_products:
+        w = _weight(p)
+        if p.category not in by_category or w > by_category[p.category][1]:
+            by_category[p.category] = (p, w)
+
+    total = sum(w for _, w in by_category.values())
     if total <= _BASE_LOAD_THRESHOLD:
         return results
 
-    all_ids = [p.id for p in base_products]
-    for p in base_products:
-        others = [pid for pid in all_ids if pid != p.id]
+    # Only flag products from distinct heavy categories — not all candidates
+    flagged_ids = [p.id for p, _ in by_category.values()]
+    for p, _ in by_category.values():
+        others = [pid for pid in flagged_ids if pid != p.id]
         results[p.id] = CompatibilityResponse(
             is_compatible=False,
             reason=(
-                f"Texture Harmony Alert: This set of base products ({total}/20) is too heavy "
+                f"Texture Harmony Alert: This combination of base products ({total}/20) is too heavy "
                 "for a natural finish. Stacking multiple full-coverage layers can create "
                 "a mask-like effect. Try swapping one for a more breathable, sheerer formula."
             )[:300],
