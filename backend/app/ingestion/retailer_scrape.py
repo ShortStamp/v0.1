@@ -48,6 +48,8 @@ class RetailerConfig:
     slug: str
     name: str
     base_url: str
+    # Affiliate network for future monetization (empty = not yet confirmed)
+    affiliate_network: str = ""
 
     def search_url(self, term: str, page: int) -> str:
         q = quote_plus(term)
@@ -55,13 +57,26 @@ class RetailerConfig:
             return f"https://www.amazon.com/s?k={q}&i=beauty&page={page}"
         if self.slug == "sephora":
             return f"https://www.sephora.com/search?keyword={q}&currentPage={page}"
+        if self.slug == "ulta":
+            return f"https://www.ulta.com/search?search={q}&page={page}"
+        if self.slug == "yesstyle":
+            return f"https://www.yesstyle.com/en/search.html?vc=&vc_all={q}&page={page}"
+        if self.slug == "sokoglam":
+            return f"https://sokoglam.com/search?q={q}&type=product&page={page}"
+        if self.slug == "stylevana":
+            return f"https://www.stylevana.com/en_US/catalogsearch/result/?q={q}&p={page}"
         return f"https://www.ulta.com/search?search={q}&page={page}"
 
 
 RETAILERS = [
-    RetailerConfig(slug="amazon", name="Amazon", base_url="https://www.amazon.com"),
-    RetailerConfig(slug="sephora", name="Sephora", base_url="https://www.sephora.com"),
-    RetailerConfig(slug="ulta", name="Ulta Beauty", base_url="https://www.ulta.com"),
+    # Western retailers
+    RetailerConfig(slug="amazon", name="Amazon", base_url="https://www.amazon.com", affiliate_network="Amazon Associates"),
+    RetailerConfig(slug="sephora", name="Sephora", base_url="https://www.sephora.com", affiliate_network="Rakuten Advertising"),
+    RetailerConfig(slug="ulta", name="Ulta Beauty", base_url="https://www.ulta.com", affiliate_network="CJ Affiliate"),
+    # K-beauty / C-beauty retailers
+    RetailerConfig(slug="yesstyle", name="YesStyle", base_url="https://www.yesstyle.com", affiliate_network="ShareASale"),
+    RetailerConfig(slug="sokoglam", name="Soko Glam", base_url="https://sokoglam.com", affiliate_network="ShareASale"),
+    RetailerConfig(slug="stylevana", name="Stylevana", base_url="https://www.stylevana.com", affiliate_network="Awin"),
 ]
 
 
@@ -109,11 +124,29 @@ def _parse_ingredient_string(raw: str) -> list[str] | None:
     return ingredients if len(ingredients) >= 2 else None
 
 
+_NON_MAKEUP_KEYWORDS = (
+    "shampoo", "conditioner", "hair mask", "hair oil", "hair serum",
+    "hair treatment", "hair styling", "hair spray", "dry shampoo", "curl",
+    "scalp", "eau de parfum", "eau de toilette", "cologne", " perfume",
+    "body wash", "body lotion", "body oil", "body serum", "body butter",
+    "body scrub", "body mist", "body cream", "deodorant", "antiperspirant",
+    "facial steamer", "face steamer", "nail polish", "nail lacquer", "nail color",
+    "cleanser", "moisturizer",
+)
+
+
+def _is_non_makeup_product(name: str) -> bool:
+    """Return True if the product name clearly indicates a non-makeup item."""
+    lowered = name.lower()
+    return any(kw in lowered for kw in _NON_MAKEUP_KEYWORDS)
+
+
 def _looks_low_quality_name(name: str) -> bool:
     if not name:
         return True
     lowered = name.lower()
-    if lowered in {"product", "amazon product", "sephora product", "ulta beauty product"}:
+    if lowered in {"product", "amazon product", "sephora product", "ulta beauty product",
+                   "yesstyle product", "soko glam product", "stylevana product"}:
         return True
     return "cs sr loc" in lowered or len(name) < 4
 
@@ -169,6 +202,19 @@ def _external_id_from_url(retailer_slug: str, url: str) -> str | None:
         m = re.search(r"/p/([^/?#]+)", path, flags=re.IGNORECASE)
         if m:
             return m.group(1).lower()
+    if retailer_slug == "yesstyle":
+        # URLs like /en/{product-name}/info/{id}.html
+        m = re.search(r"/info/(\d+)\.html", path, flags=re.IGNORECASE)
+        return f"YS{m.group(1)}" if m else None
+    if retailer_slug == "sokoglam":
+        # URLs like /products/{slug}
+        m = re.search(r"/products/([^/?#]+)", path, flags=re.IGNORECASE)
+        return m.group(1).lower() if m else None
+    if retailer_slug == "stylevana":
+        # URLs like /en_US/.../p/{id} or /en_US/.../{slug}
+        m = re.search(r"/p/(\d+)", path, flags=re.IGNORECASE)
+        if m:
+            return f"SV{m.group(1)}"
 
     digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
     return f"url-{digest}"
@@ -277,6 +323,12 @@ def _parse_link_candidates(html: str, retailer: RetailerConfig) -> list[ScrapedC
             continue
         if retailer.slug == "ulta" and "/p/" not in parsed.path:
             continue
+        if retailer.slug == "yesstyle" and "/info/" not in parsed.path:
+            continue
+        if retailer.slug == "sokoglam" and "/products/" not in parsed.path:
+            continue
+        if retailer.slug == "stylevana" and re.search(r"/p/\d+", parsed.path, re.I) is None:
+            continue
 
         external_id = _external_id_from_url(retailer.slug, absolute)
         if not external_id or external_id in seen:
@@ -308,6 +360,17 @@ def _guess_name_from_url(url: str, retailer_slug: str) -> str:
     if retailer_slug == "sephora":
         # sephora product urls often end with slug-P12345
         tail = re.sub(r"-P\d+$", "", tail, flags=re.IGNORECASE)
+    if retailer_slug == "yesstyle":
+        # /en/{product-name}/info/{id}.html — grab the segment before /info/
+        parts = path.split("/info/")
+        if len(parts) > 1:
+            tail = parts[0].rstrip("/").split("/")[-1]
+    if retailer_slug == "sokoglam":
+        # /products/{slug} — tail is already the slug
+        pass
+    if retailer_slug == "stylevana":
+        # Strip trailing /p/{id} to get the product name slug
+        tail = re.sub(r"/p/\d+$", "", path).rstrip("/").split("/")[-1]
     cleaned = _clean_product_name(re.sub(r"[-_]+", " ", tail))
     return cleaned.title() if cleaned else "Product"
 
@@ -640,6 +703,9 @@ async def _get_or_create_retailer(
     result = await db.execute(select(Retailer).where(Retailer.slug == retailer_cfg.slug))
     retailer = result.scalar_one_or_none()
     if not retailer:
+        result = await db.execute(select(Retailer).where(Retailer.name == retailer_cfg.name))
+        retailer = result.scalar_one_or_none()
+    if not retailer:
         retailer = Retailer(
             name=retailer_cfg.name,
             slug=retailer_cfg.slug,
@@ -689,7 +755,7 @@ async def _upsert_product_and_price(
     now = datetime.now(UTC)
     source_name = f"{retailer_cfg.slug}_scrape"
     clean_name = _clean_product_name(candidate.name) or candidate.name
-    generic_brand_values = {"unknown", "amazon", "sephora", "ulta beauty"}
+    generic_brand_values = {"unknown", "amazon", "sephora", "ulta beauty", "yesstyle", "soko glam", "stylevana"}
 
     result = await db.execute(
         select(Product).where(
@@ -910,6 +976,8 @@ async def ingest_retailer_scrape(db: AsyncSession) -> dict[str, Any]:
 
                     for candidate in candidates:
                         stats["candidates_seen"] += 1
+                        if _is_non_makeup_product(candidate.name):
+                            continue
                         if (
                             detail_enrich_remaining.get(retailer_cfg.slug, 0) > 0
                             and (

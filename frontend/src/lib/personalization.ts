@@ -26,16 +26,25 @@ function getStoredBeautyProfile(): Partial<BeautyProfile> | null {
 }
 
 export function getQuizAutoFilters(
-  category: CategoryDefinition
+  category: CategoryDefinition,
+  availableOptions: Record<string, string[]> = {}
 ): Record<string, Set<string>> {
   const profile = getStoredBeautyProfile();
   if (!profile) return {};
 
   const result: Record<string, Set<string>> = {};
-  const getOptions = (key: string) =>
-    category.filters.find((f) => f.key === key && f.type === "checkbox")?.options;
+  const getOptions = (key: string) => {
+    // Prefer API-fetched options (reflects actual DB contents).
+    // Fall back to static options only if the API hasn't returned any yet.
+    const apiOpts = availableOptions[key];
+    if (apiOpts && apiOpts.length > 0) return apiOpts;
+    return category.filters.find((f) => f.key === key && f.type === "checkbox")?.options;
+  };
   const addMatch = (key: string, candidates: string[]) => {
-    const matched = findMatchingOption(getOptions(key), candidates);
+    const opts = getOptions(key);
+    // Don't apply filter if the DB has no products with this filter value yet.
+    if (!opts || opts.length === 0) return;
+    const matched = findMatchingOption(opts, candidates);
     if (matched) result[key] = new Set([matched]);
   };
 

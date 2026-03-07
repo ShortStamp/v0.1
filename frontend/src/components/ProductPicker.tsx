@@ -103,11 +103,14 @@ export default function ProductPicker({ categoryKey, onSelect, onClose }: Produc
     observerRef.current.observe(node);
   }, []); // stable — never recreated
 
+  // Apply quiz auto-filters only after we know which filter values exist in the DB.
+  // This prevents over-filtering when most products lack filter metadata.
   useEffect(() => {
-    const defaults = getQuizAutoFilters(category);
+    if (Object.keys(filterOptionsByKey).length === 0) return;
+    const defaults = getQuizAutoFilters(category, filterOptionsByKey);
     if (Object.keys(defaults).length === 0) return;
     setActiveFilters((prev) => (Object.keys(prev).length > 0 ? prev : defaults));
-  }, [category]);
+  }, [category, filterOptionsByKey]);
 
   // Reset pagination whenever search/filters/category change
   useEffect(() => {

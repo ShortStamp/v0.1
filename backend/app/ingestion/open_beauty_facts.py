@@ -27,33 +27,99 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Makeup search terms — covers the 5 face areas (Base, Eyes, Brows, Cheeks, Lips)
+# Includes K-beauty (Korean) and C-beauty (Chinese) product types.
 SEARCH_TERMS = [
-    "foundation", "concealer", "primer", "powder",
-    "blush", "bronzer", "highlighter",
-    "eyeshadow", "eyeliner", "mascara",
+    # --- Base ---
+    "foundation", "concealer", "primer", "powder", "setting spray",
+    # K-beauty / C-beauty base
+    "BB cream", "CC cream", "cushion foundation", "skin tint",
+    "tinted moisturizer", "serum foundation", "air cushion",
+    # Base extras
+    "color corrector", "pore primer", "hydrating primer",
+    "face mist", "setting powder", "translucent powder", "loose powder",
+
+    # --- Cheeks ---
+    "blush", "bronzer", "highlighter", "contour",
+    "cream blush", "liquid blush", "blush stick",
+    "contour stick", "bronzer stick", "highlighter stick",
+
+    # --- Eyes ---
+    "eyeshadow", "eyeliner", "mascara", "eyeshadow palette",
+    "gel eyeliner", "kajal", "waterproof mascara", "volumizing mascara",
+    "false lashes", "false eyelashes", "strip lashes",
+
+    # --- Brows ---
+    "brow pencil", "brow gel", "brow pomade", "brow tint",
+
+    # --- Lips ---
     "lipstick", "lip gloss", "lip liner",
-    "setting spray",
-    "brow pencil", "brow gel",
+    # K-beauty / C-beauty lips
+    "lip tint", "lip oil", "lip stain", "lip balm",
+    "lip plumper", "gradient lip",
 ]
 
 # Search term -> category_key mapping
 CATEGORY_MAP = {
+    # Base
     "foundation": "foundation",
     "concealer": "concealer",
     "primer": "primer",
     "powder": "powder",
+    "setting spray": "setting-spray",
+    # K-beauty / C-beauty base
+    "BB cream": "foundation",
+    "CC cream": "foundation",
+    "cushion foundation": "foundation",
+    "skin tint": "foundation",
+    "tinted moisturizer": "foundation",
+    "serum foundation": "foundation",
+    "air cushion": "foundation",
+    # Base extras
+    "color corrector": "primer",
+    "pore primer": "primer",
+    "hydrating primer": "primer",
+    "face mist": "setting-spray",
+    "setting powder": "powder",
+    "translucent powder": "powder",
+    "loose powder": "powder",
+    # Cheeks
     "blush": "blush",
     "bronzer": "bronzer",
     "highlighter": "highlighter",
+    "contour": "contour",
+    "cream blush": "blush",
+    "liquid blush": "blush",
+    "blush stick": "blush",
+    "contour stick": "contour",
+    "bronzer stick": "bronzer",
+    "highlighter stick": "highlighter",
+    # Eyes
     "eyeshadow": "eyeshadow",
     "eyeliner": "eyeliner",
     "mascara": "mascara",
+    "eyeshadow palette": "eyeshadow",
+    "gel eyeliner": "eyeliner",
+    "kajal": "eyeliner",
+    "waterproof mascara": "mascara",
+    "volumizing mascara": "mascara",
+    "false lashes": "false-lashes",
+    "false eyelashes": "false-lashes",
+    "strip lashes": "false-lashes",
+    # Brows
+    "brow pencil": "brow-pencil",
+    "brow gel": "brow-gel",
+    "brow pomade": "brow-pencil",
+    "brow tint": "brow-gel",
+    # Lips
     "lipstick": "lipstick",
     "lip gloss": "lip-gloss",
     "lip liner": "lip-liner",
-    "setting spray": "setting-spray",
-    "brow pencil": "brow-pencil",
-    "brow gel": "brow-gel",
+    "lip tint": "lipstick",
+    "lip oil": "lip-gloss",
+    "lip stain": "lipstick",
+    "lip balm": "lip-gloss",
+    "lip plumper": "lip-gloss",
+    "gradient lip": "lipstick",
 }
 
 
@@ -271,6 +337,9 @@ async def ingest_open_beauty_facts(db: AsyncSession) -> dict[str, Any]:
                                     ingredient_list = [i.strip() for i in ingredients.split(",") if i.strip()]
                                 else:
                                     ingredient_list = None
+
+                                # Extract filter values from product name/description
+                                filters = extract_filters_from_obf_product(category_key, item)
 
                                 outcome = await _upsert_product(
                                     db,
