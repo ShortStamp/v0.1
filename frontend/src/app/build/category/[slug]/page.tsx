@@ -83,9 +83,7 @@ export default function CategoryPage() {
   useEffect(() => {
     if (!category) return;
     const defaults = getQuizAutoFilters(category);
-    if (Object.keys(defaults).length === 0) return;
-    setHasQuizFilters(true);
-    setActiveFilters((prev) => (Object.keys(prev).length > 0 ? prev : defaults));
+    setHasQuizFilters(Object.keys(defaults).length > 0);
   }, [category]);
 
   // Reset pagination whenever search/filters/category/sort change
@@ -108,30 +106,25 @@ export default function CategoryPage() {
     const fetchProducts = async () => {
       try {
         const filters: Record<string, string> = {};
-        for (const [key, values] of Object.entries(activeFilters)) {
-          if (values.size > 0) filters[key] = Array.from(values).join(",");
+        if (sort === "for_you") {
+          const quizFilters = getQuizAutoFilters(category, filterOptionsByKey);
+          for (const [key, values] of Object.entries(quizFilters)) {
+            if (values.size > 0) filters[key] = Array.from(values).join(",");
+          }
+        } else {
+          for (const [key, values] of Object.entries(activeFilters)) {
+            if (values.size > 0) filters[key] = Array.from(values).join(",");
+          }
         }
 
-        let data = await api.getProducts({
+        const data = await api.getProducts({
           category: categoryKey,
           search: search || undefined,
           filters,
-          sort,
+          sort: sort === "for_you" ? "stamp_score_desc" : sort,
           page,
           per_page: PER_PAGE,
         });
-
-        // Page 1 only: if quiz filters yield fewer than 3 pages of results, clear them and reload unfiltered
-        if (
-          isFirstPage &&
-          data.total < PER_PAGE * 3 &&
-          Object.keys(filters).some((k) => k !== "brand")
-        ) {
-          const brandOnly: Record<string, Set<string>> = {};
-          if (filters.brand) brandOnly.brand = new Set([filters.brand]);
-          if (!cancelled) setActiveFilters(brandOnly);
-          return; // the setActiveFilters call will trigger a re-fetch with cleared filters
-        }
 
         if (cancelled) return;
 
@@ -379,6 +372,7 @@ export default function CategoryPage() {
           aria-label="Sort products"
         >
           <option value="stamp_score_desc">Best Match</option>
+          {hasQuizFilters && <option value="for_you">For You</option>}
           <option value="price_asc">Best Price</option>
           <option value="name_asc">A–Z</option>
         </select>
