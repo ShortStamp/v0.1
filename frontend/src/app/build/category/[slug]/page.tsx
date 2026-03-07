@@ -108,8 +108,21 @@ export default function CategoryPage() {
         const filters: Record<string, string> = {};
         if (sort === "for_you") {
           const quizFilters = getQuizAutoFilters(category, filterOptionsByKey);
+          const quizKeys = Object.keys(quizFilters);
           for (const [key, values] of Object.entries(quizFilters)) {
             if (values.size > 0) filters[key] = Array.from(values).join(",");
+          }
+          // Progressively relax filters if nothing matches
+          if (isFirstPage && quizKeys.length > 0) {
+            let probe = await api.getProducts({ category: categoryKey, filters, sort: "stamp_score_desc", page: 1, per_page: 1 });
+            let relaxed = { ...filters };
+            const relaxOrder = ["skinType", "coverage", "finish"];
+            for (const dropKey of relaxOrder) {
+              if (probe.total > 0) break;
+              delete relaxed[dropKey];
+              probe = await api.getProducts({ category: categoryKey, filters: relaxed, sort: "stamp_score_desc", page: 1, per_page: 1 });
+            }
+            if (probe.total > 0) Object.assign(filters, relaxed), Object.keys(filters).forEach(k => !(k in relaxed) && delete filters[k]);
           }
         } else {
           for (const [key, values] of Object.entries(activeFilters)) {
