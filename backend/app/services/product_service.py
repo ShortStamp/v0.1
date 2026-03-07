@@ -1,3 +1,4 @@
+import re
 from sqlalchemy import func, select
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,15 @@ from app.schemas.product import (
 )
 from app.utils.exceptions import NotFoundError
 from app.utils.pagination import paginate
+
+
+def _fix_image_url(url: str | None) -> str:
+    if not url or url == "/placeholder-product.jpg":
+        return "/placeholder-product.jpg"
+    # Sephora CDN images default to imwidth=62 (62px thumbnail) — bump to 500px
+    if "sephora.com" in url and "imwidth=" in url:
+        url = re.sub(r"imwidth=\d+", "imwidth=500", url)
+    return url
 
 
 def _get_walmart_url(product: Product) -> str | None:
@@ -73,7 +83,7 @@ def _product_to_list_item(product: Product) -> ProductListItem:
         id=product.id,
         name=product.name,
         brand=product.brand.name,
-        image=product.image_url,
+        image=_fix_image_url(product.image_url),
         category=product.category_key,
         stamp_score=product.stamp_score,
         prices=[
@@ -95,7 +105,7 @@ def _product_to_detail(product: Product) -> ProductDetail:
         id=product.id,
         name=product.name,
         brand=product.brand.name,
-        image=product.image_url,
+        image=_fix_image_url(product.image_url),
         category=product.category_key,
         stamp_score=product.stamp_score,
         description=product.description,
@@ -241,13 +251,14 @@ def _apply_attribute_filters(query, count_query, filters: dict[str, str] | None 
 
 
 def _has_valid_price_subquery():
-    """Subquery: product has at least one price row with a real purchase URL."""
+    """Subquery: product has at least one price row with a real purchase URL and non-zero price."""
     return (
         sa_select(ProductPrice.id)
         .where(
             ProductPrice.product_id == Product.id,
             ProductPrice.url.notin_(["#", ""]),
             ProductPrice.url.isnot(None),
+            ProductPrice.price > 0,
         )
         .correlate(Product)
         .exists()

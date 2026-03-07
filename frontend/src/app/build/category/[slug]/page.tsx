@@ -55,6 +55,9 @@ export default function CategoryPage() {
   const stateRef = useRef({ hasMore, loadingMore, loading });
   stateRef.current = { hasMore, loadingMore, loading };
 
+  // Ref for the scrollable product list container (used as IntersectionObserver root)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
   // Callback ref — creates/destroys observer whenever the sentinel mounts/unmounts
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useCallback((node: HTMLDivElement | null) => {
@@ -72,7 +75,7 @@ export default function CategoryPage() {
           }
         }
       },
-      { threshold: 0, rootMargin: "0px 0px 200px 0px" }
+      { threshold: 0, rootMargin: "0px 0px 200px 0px", root: scrollContainerRef.current }
     );
     observerRef.current.observe(node);
   }, []); // stable — never recreated
@@ -118,22 +121,16 @@ export default function CategoryPage() {
           per_page: PER_PAGE,
         });
 
-        // Page 1 only: if filters yield no results, retry without non-brand filters
+        // Page 1 only: if quiz filters yield fewer than 3 pages of results, clear them and reload unfiltered
         if (
           isFirstPage &&
-          data.items.length === 0 &&
+          data.total < PER_PAGE * 3 &&
           Object.keys(filters).some((k) => k !== "brand")
         ) {
-          const brandOnly: Record<string, string> = {};
-          if (filters.brand) brandOnly.brand = filters.brand;
-          data = await api.getProducts({
-            category: categoryKey,
-            search: search || undefined,
-            filters: brandOnly,
-            sort,
-            page: 1,
-            per_page: PER_PAGE,
-          });
+          const brandOnly: Record<string, Set<string>> = {};
+          if (filters.brand) brandOnly.brand = new Set([filters.brand]);
+          if (!cancelled) setActiveFilters(brandOnly);
+          return; // the setActiveFilters call will trigger a re-fetch with cleared filters
         }
 
         if (cancelled) return;
@@ -458,7 +455,7 @@ export default function CategoryPage() {
         </aside>
 
         {/* Product list / tiles */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-32">
               <Loader2 className="h-8 w-8 animate-spin text-foreground/30" />
