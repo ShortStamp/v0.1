@@ -125,11 +125,11 @@ export default function BuildPage() {
             </p>
           </div>
           <h1 className="mb-4 text-4xl font-bold font-serif">
-            Set Compatibility Engine
+            Build Your Kit. Scan for Conflicts.
           </h1>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-md text-sm leading-relaxed text-foreground/60 font-sans">
-              Input your kit. Detect pilling. Perfect your finish. Our AI agents analyze mechanical and chemical stability in real-time.
+              Every product is checked against your skin profile and for chemical incompatibilities with your other picks.
             </p>
             <button
               onClick={() => {

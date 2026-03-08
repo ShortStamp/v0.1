@@ -135,7 +135,7 @@ export default function GroupPage() {
         <div>
           <h1 className="text-2xl font-bold uppercase tracking-tight">{group.label}</h1>
           <p className="text-sm text-foreground/40">
-            Choose products for each category below.
+            Each product is checked against your skin profile and for chemical conflicts with your other picks.
           </p>
         </div>
       </div>
@@ -209,37 +209,31 @@ export default function GroupPage() {
                             <div className="mt-3 rounded-full bg-foreground px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-white font-sans">
                                 ! API Quota Met
                             </div>
-                        ) : (() => {
-                            const compat = compatibilityMap[slot.product!.id];
-                            if (!compat) return null;
-                            return (
-                            <div className="mt-3">
-                                <ConflictBadge
-                                    compat={compat}
-                                    resolveName={(id) => getDisplayName(slots.find((s) => s.product?.id === id)?.product?.name ?? "another product")}
-                                    position="above"
-                                    debugMode={debugMode}
-                                />
-                            </div>
-                            );
-                        })()}
-
-                        {/* Analyzing shimmer */}
-                        {!quotaExceeded && isAnalyzing && !compatibilityMap[slot.product!.id] && (
+                        ) : isAnalyzing ? (
                             <p className="mt-3 animate-pulse text-[8px] font-bold uppercase tracking-widest text-accent/50 font-sans">
-                            ⚗ Analyzing…
+                                ⚗ Analyzing…
                             </p>
-                        )}
-
-                        {/* Compatible badge — always clickable to show per-agent pass traces */}
-                        {!quotaExceeded && !isAnalyzing && analyzedIds.has(slot.product!.id) && !compatibilityMap[slot.product!.id] && (
-                            <div className="mt-3">
-                              <PassBadge
-                                trace={allTraces[slot.product!.id] ?? []}
-                                position="above"
-                              />
-                            </div>
-                        )}
+                        ) : analyzedIds.size > 0 ? (() => {
+                            const compat = compatibilityMap[slot.product!.id];
+                            const hasConflict = compat && !compat.isCompatible;
+                            if (hasConflict) {
+                                return (
+                                    <div className="mt-3">
+                                        <ConflictBadge
+                                            compat={compat}
+                                            resolveName={(id) => getDisplayName(slots.find((s) => s.product?.id === id)?.product?.name ?? "another product")}
+                                            position="above"
+                                            debugMode={debugMode}
+                                        />
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div className="mt-3">
+                                    <PassBadge trace={[]} position="above" />
+                                </div>
+                            );
+                        })() : null}
 
                         <div className="mt-auto pt-4 w-full border-t border-border/30">
                             <p className="text-lg font-bold text-foreground font-sans tracking-tight">
