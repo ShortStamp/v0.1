@@ -1,48 +1,35 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
-class SignupRequest(BaseModel):
+class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
-    display_name: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
 
 
 class TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
+    email: str
+    subscription_status: str
 
 
 class UserResponse(BaseModel):
-    id: str
+    id: int
     email: str
-    display_name: str | None = None
-    avatar_url: str | None = None
-    is_admin: bool = False
+    subscription_status: str
+    has_active_subscription: bool
 
-    model_config = {"from_attributes": True}
-
-
-class AuthResponse(BaseModel):
-    user: UserResponse
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
-class GoogleOAuthRequest(BaseModel):
-    id_token: str
-
-
-class AppleOAuthRequest(BaseModel):
-    id_token: str
-    user: dict | None = None
+    class Config:
+        from_attributes = True

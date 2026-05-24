@@ -1,50 +1,68 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+
+# ShortStamp — start all three services concurrently
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$ROOT_DIR/backend"
-FRONTEND_DIR="$ROOT_DIR/frontend"
 
-if ! command -v npm >/dev/null 2>&1; then
-  echo "npm is required but was not found in PATH."
-  exit 1
-fi
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required but was not found in PATH."
-  exit 1
-fi
+echo -e "${GREEN}Starting ShortStamp dev environment...${NC}"
+echo ""
 
-cleanup() {
-  local code=$?
-  trap - EXIT INT TERM
-  if [[ -n "${BACKEND_PID:-}" ]] && kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
-    kill "$BACKEND_PID" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "${FRONTEND_PID:-}" ]] && kill -0 "$FRONTEND_PID" >/dev/null 2>&1; then
-    kill "$FRONTEND_PID" >/dev/null 2>&1 || true
-  fi
-  wait || true
-  exit "$code"
-}
+# Kill background jobs on exit
+trap 'echo -e "\n${RED}Shutting down...${NC}"; kill $(jobs -p) 2>/dev/null; exit' SIGINT SIGTERM EXIT
 
-trap cleanup EXIT INT TERM
-
+# Start backend
+echo -e "${BLUE}[backend]${NC} Starting FastAPI on port 8000..."
 (
-  cd "$BACKEND_DIR"
-  if [[ -f ".venv/bin/activate" ]]; then
-    # Use project venv when present.
-    # shellcheck disable=SC1091
-    . ".venv/bin/activate"
+  cd "$ROOT_DIR/backend"
+  if [ ! -d ".venv" ]; then
+    echo -e "${YELLOW}[backend]${NC} Creating virtual environment..."
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -e ".[dev]" -q
+  else
+    source .venv/bin/activate
   fi
-  ENABLE_SCHEDULER=true python3 -m uvicorn app.main:app --reload --port 8000
+  uvicorn app.main:app --reload --port 8000
 ) &
 BACKEND_PID=$!
 
+# Start website
+echo -e "${BLUE}[website]${NC} Starting Next.js on port 3000..."
 (
-  cd "$FRONTEND_DIR"
+  cd "$ROOT_DIR/website"
+  if [ ! -d "node_modules" ]; then
+    echo -e "${YELLOW}[website]${NC} Installing dependencies..."
+    npm install -q
+  fi
   npm run dev
 ) &
-FRONTEND_PID=$!
+WEBSITE_PID=$!
 
-wait -n "$BACKEND_PID" "$FRONTEND_PID"
+# Start desktop
+echo -e "${BLUE}[desktop]${NC} Starting Electron dev..."
+(
+  cd "$ROOT_DIR/desktop"
+  if [ ! -d "node_modules" ]; then
+    echo -e "${YELLOW}[desktop]${NC} Installing dependencies..."
+    npm install -q
+  fi
+  npm run dev
+) &
+DESKTOP_PID=$!
+
+echo ""
+echo -e "${GREEN}All services started:${NC}"
+echo -e "  Website:  ${BLUE}http://localhost:3000${NC}"
+echo -e "  Backend:  ${BLUE}http://localhost:8000${NC}"
+echo -e "  Desktop:  Electron overlay"
+echo ""
+echo -e "Press ${RED}Ctrl+C${NC} to stop all services."
+
+wait

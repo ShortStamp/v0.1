@@ -1,108 +1,95 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta, timezone
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from jose import jwt
+from passlib.context import CryptContext
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.config import get_settings
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
-from app.schemas.auth import (
-    AppleOAuthRequest,
-    AuthResponse,
-    GoogleOAuthRequest,
-    LoginRequest,
-    RefreshRequest,
-    SignupRequest,
-    UserResponse,
-)
-from app.services import auth_service
+from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-@router.post("/signup", response_model=AuthResponse)
-async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
-    user, access, refresh = await auth_service.signup(
-        db, body.email, body.password, body.display_name
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+
+def create_access_token(email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours)
+    payload = {"sub": email, "exp": expire, "iat": datetime.now(timezone.utc)}
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    """Create a new user account."""
+    result = await db.execute(select(User).where(User.email == body.email))
+    existing = result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists",
+        )
+
+    user = User(
+        email=body.email,
+        hashed_password=hash_password(body.password),
+        subscription_status="inactive",
     )
-    return AuthResponse(
-        user=UserResponse.model_validate(user),
-        access_token=access,
-        refresh_token=refresh,
+    db.add(user)
+    await db.flush()
+
+    token = create_access_token(user.email)
+    return TokenResponse(
+        access_token=token,
+        email=user.email,
+        subscription_status=user.subscription_status,
     )
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    user, access, refresh = await auth_service.login(db, body.email, body.password)
-    return AuthResponse(
-        user=UserResponse.model_validate(user),
-        access_token=access,
-        refresh_token=refresh,
-    )
+    """Authenticate and return a JWT."""
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
 
+    if not user or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
 
-@router.post("/refresh")
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    user, access, refresh = await auth_service.refresh_tokens(db, body.refresh_token)
-    return AuthResponse(
-        user=UserResponse.model_validate(user),
-        access_token=access,
-        refresh_token=refresh,
-    )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled",
+        )
 
-
-@router.post("/logout")
-async def logout(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    await auth_service.logout(db, user.id)
-    return {"detail": "Logged out"}
-
-
-@router.post("/oauth/google", response_model=AuthResponse)
-async def oauth_google(body: GoogleOAuthRequest, db: AsyncSession = Depends(get_db)):
-    info = await auth_service.verify_google_token(body.id_token)
-    user, access, refresh = await auth_service.oauth_login_or_signup(
-        db,
-        provider="google",
-        oauth_id=info["sub"],
-        email=info["email"],
-        display_name=info.get("name"),
-        avatar_url=info.get("picture"),
-    )
-    return AuthResponse(
-        user=UserResponse.model_validate(user),
-        access_token=access,
-        refresh_token=refresh,
-    )
-
-
-@router.post("/oauth/apple", response_model=AuthResponse)
-async def oauth_apple(body: AppleOAuthRequest, db: AsyncSession = Depends(get_db)):
-    info = await auth_service.verify_apple_token(body.id_token)
-    display_name = None
-    if body.user and isinstance(body.user, dict):
-        name_parts = body.user.get("name", {})
-        if isinstance(name_parts, dict):
-            first = name_parts.get("firstName", "")
-            last = name_parts.get("lastName", "")
-            display_name = f"{first} {last}".strip() or None
-        elif isinstance(name_parts, str):
-            display_name = name_parts or None
-    user, access, refresh = await auth_service.oauth_login_or_signup(
-        db,
-        provider="apple",
-        oauth_id=info["sub"],
-        email=info["email"],
-        display_name=display_name,
-    )
-    return AuthResponse(
-        user=UserResponse.model_validate(user),
-        access_token=access,
-        refresh_token=refresh,
+    token = create_access_token(user.email)
+    return TokenResponse(
+        access_token=token,
+        email=user.email,
+        subscription_status=user.subscription_status,
     )
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(get_current_user)):
-    return UserResponse.model_validate(user)
+async def me(current_user: User = Depends(get_current_user)):
+    """Return current user info."""
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        subscription_status=current_user.subscription_status,
+        has_active_subscription=current_user.has_active_subscription,
+    )
