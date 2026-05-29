@@ -1,11 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-// Expose safe APIs to renderer process
 contextBridge.exposeInMainWorld("shortstamp", {
-  // Screen capture
   captureScreen: (): Promise<string> => ipcRenderer.invoke("capture-screen"),
 
-  // Analysis
   analyze: (
     imageBase64: string,
     hint?: string
@@ -13,10 +10,31 @@ contextBridge.exposeInMainWorld("shortstamp", {
     verdict: "REAL" | "FAKE" | "SCAM" | "AI_GENERATED" | "UNCERTAIN";
     confidence: number;
     explanation: string;
-    category: "fact" | "link" | "media" | "general";
+    category: string;
   }> => ipcRenderer.invoke("analyze", imageBase64, hint),
 
-  // Auth
+  analyzeText: (
+    text: string,
+    mode: "factcheck" | "ai_detection"
+  ): Promise<{
+    verdict: "REAL" | "FAKE" | "SCAM" | "AI_GENERATED" | "UNCERTAIN";
+    confidence: number;
+    explanation: string;
+    category: string;
+  }> => ipcRenderer.invoke("analyze-text", text, mode),
+
+  analyzeUrl: (
+    url: string,
+    mode: "video" | "ai_detection"
+  ): Promise<{
+    verdict: "REAL" | "FAKE" | "SCAM" | "AI_GENERATED" | "UNCERTAIN";
+    confidence: number;
+    explanation: string;
+    category: string;
+  }> => ipcRenderer.invoke("analyze-url", url, mode),
+
+  readClipboard: (): Promise<string> => ipcRenderer.invoke("read-clipboard"),
+
   login: (
     email: string,
     password: string
@@ -28,7 +46,11 @@ contextBridge.exposeInMainWorld("shortstamp", {
 
   logout: (): Promise<boolean> => ipcRenderer.invoke("auth-logout"),
 
-  // Window controls
   hide: (): void => ipcRenderer.send("window-hide"),
   close: (): void => ipcRenderer.send("window-close"),
+
+  onStartAnalysis: (callback: () => void) => {
+    ipcRenderer.on("start-analysis", callback);
+    return () => ipcRenderer.removeListener("start-analysis", callback);
+  },
 });

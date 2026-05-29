@@ -5,6 +5,7 @@ import {
   ipcMain,
   desktopCapturer,
   screen,
+  clipboard,
 } from "electron";
 import { join } from "path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
@@ -49,14 +50,17 @@ let overlayWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === "development";
 const API_URL = process.env.SHOTSTAMP_API_URL || "http://localhost:8000";
 
+const BAR_WIDTH = 720;
+const BAR_HEIGHT = 96;
+
 function createOverlayWindow(): void {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const { workArea } = screen.getPrimaryDisplay();
 
   overlayWindow = new BrowserWindow({
-    width: 420,
-    height: 620,
-    x: width - 440,
-    y: Math.floor(height / 2) - 310,
+    width: BAR_WIDTH,
+    height: BAR_HEIGHT,
+    x: workArea.x + Math.floor((workArea.width - BAR_WIDTH) / 2),
+    y: workArea.y,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -69,17 +73,15 @@ function createOverlayWindow(): void {
       nodeIntegration: false,
       sandbox: false,
     },
-    titleBarStyle: "hidden",
-    vibrancy: "under-window",
-    visualEffectState: "active",
-    hasShadow: true,
+    hasShadow: false,
+    visibleOnAllWorkspaces: true,
   });
 
-  overlayWindow.setWindowButtonVisibility?.(false);
+  overlayWindow.setAlwaysOnTop(true, "screen-saver");
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   if (isDev) {
     overlayWindow.loadURL("http://localhost:5173");
-    // overlayWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     overlayWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
@@ -91,33 +93,28 @@ function createOverlayWindow(): void {
   overlayWindow.on("closed", () => {
     overlayWindow = null;
   });
-
-  // Prevent the window from appearing in screenshots
-  overlayWindow.setContentProtection(true);
 }
 
-function toggleOverlay(): void {
+function triggerAnalysis(): void {
   if (!overlayWindow) {
     createOverlayWindow();
+    overlayWindow!.once("ready-to-show", () => {
+      overlayWindow?.show();
+      overlayWindow?.webContents.send("start-analysis");
+    });
     return;
   }
 
-  if (overlayWindow.isVisible()) {
-    overlayWindow.hide();
-  } else {
-    overlayWindow.show();
-    overlayWindow.focus();
-  }
+  if (!overlayWindow.isVisible()) overlayWindow.show();
+  overlayWindow.webContents.send("start-analysis");
 }
 
-// IPC: capture the screen (hide overlay first to avoid capturing it)
+// IPC: capture the screen (hide overlay first)
 ipcMain.handle("capture-screen", async (): Promise<string> => {
   const wasVisible = overlayWindow?.isVisible() ?? false;
 
-  // Briefly hide the overlay so it doesn't appear in the screenshot
   if (wasVisible) {
     overlayWindow?.hide();
-    // Small delay to let the OS composit the screen without our window
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
 
@@ -128,93 +125,117 @@ ipcMain.handle("capture-screen", async (): Promise<string> => {
     });
 
     const primarySource = sources[0];
-    if (!primarySource) {
-      throw new Error("No screen source available");
-    }
+    if (!primarySource) throw new Error("No screen source available");
 
-    const thumbnail = primarySource.thumbnail;
-    const pngBuffer = thumbnail.toPNG();
-    const base64 = pngBuffer.toString("base64");
-    return base64;
+    const pngBuffer = primarySource.thumbnail.toPNG();
+    return pngBuffer.toString("base64");
   } finally {
-    if (wasVisible) {
-      overlayWindow?.show();
-    }
+    if (wasVisible) overlayWindow?.show();
   }
 });
 
 // IPC: send screenshot to backend for analysis
-ipcMain.handle(
-  "analyze",
-  async (_event, imageBase64: string, hint?: string) => {
-    const token = storeGet("token");
-    if (!token) {
-      throw new Error("Not authenticated");
+ipcMain.handle("analyze", async (_event, imageBase64: string, hint?: string) => {
+  const token = storeGet("token");
+
+  const response = await fetch(`${API_URL}/analyze`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ image_base64: imageBase64, hint }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      storeDelete("token");
+      storeDelete("email");
+      throw new Error("Session expired — please log in again");
     }
-
-    const response = await fetch(`${API_URL}/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ image_base64: imageBase64, hint }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        store.delete("token");
-        store.delete("email");
-        throw new Error("Session expired — please log in again");
-      }
-      if (response.status === 402) {
-        throw new Error("Subscription required");
-      }
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.detail || `API error ${response.status}`);
-    }
-
-    return response.json();
+    if (response.status === 402) throw new Error("Subscription required");
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `API error ${response.status}`);
   }
-);
 
-// IPC: auth — store token
-ipcMain.handle(
-  "auth-login",
-  async (_event, email: string, password: string) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+  return response.json();
+});
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.detail || "Login failed");
-    }
+// IPC: read system clipboard
+ipcMain.handle("read-clipboard", () => clipboard.readText());
 
-    const data = await response.json();
-    storeSet("token", data.access_token);
-    storeSet("email", data.email);
-    return { email: data.email, subscription_status: data.subscription_status };
+// IPC: analyze plain text (highlight / AI detection mode)
+ipcMain.handle("analyze-text", async (_event, text: string, mode: string) => {
+  const token = storeGet("token");
+  const response = await fetch(`${API_URL}/analyze-text`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ text, mode }),
+  });
+  if (!response.ok) {
+    if (response.status === 401) { storeDelete("token"); storeDelete("email"); throw new Error("Session expired"); }
+    if (response.status === 402) throw new Error("Subscription required");
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `API error ${response.status}`);
   }
-);
+  return response.json();
+});
 
-// IPC: get stored auth state
+// IPC: analyze a URL (video reader / AI detection mode)
+ipcMain.handle("analyze-url", async (_event, url: string, mode: string) => {
+  const token = storeGet("token");
+  const response = await fetch(`${API_URL}/analyze-url`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ url, mode }),
+  });
+  if (!response.ok) {
+    if (response.status === 401) { storeDelete("token"); storeDelete("email"); throw new Error("Session expired"); }
+    if (response.status === 402) throw new Error("Subscription required");
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `API error ${response.status}`);
+  }
+  return response.json();
+});
+
+// IPC: auth
+ipcMain.handle("auth-login", async (_event, email: string, password: string) => {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Login failed");
+  }
+
+  const data = await response.json();
+  storeSet("token", data.access_token);
+  storeSet("email", data.email);
+  return { email: data.email, subscription_status: data.subscription_status };
+});
+
 ipcMain.handle("auth-get-state", () => {
   const token = storeGet("token");
   const email = storeGet("email");
   return token ? { token, email } : null;
 });
 
-// IPC: logout
 ipcMain.handle("auth-logout", () => {
   storeDelete("token");
   storeDelete("email");
   return true;
 });
 
-// IPC: close/minimize
+// IPC: window controls
 ipcMain.on("window-hide", () => overlayWindow?.hide());
 ipcMain.on("window-close", () => {
   overlayWindow?.close();
@@ -224,14 +245,11 @@ ipcMain.on("window-close", () => {
 app.whenReady().then(() => {
   createOverlayWindow();
 
-  // Register global shortcut
   const shortcut = process.platform === "darwin" ? "Command+Shift+S" : "Control+Shift+S";
-  globalShortcut.register(shortcut, toggleOverlay);
+  globalShortcut.register(shortcut, triggerAnalysis);
 
   app.on("activate", () => {
-    if (!overlayWindow) {
-      createOverlayWindow();
-    }
+    if (!overlayWindow) createOverlayWindow();
   });
 });
 
@@ -239,10 +257,6 @@ app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });
 
-// Keep running in background — don't quit when all windows are closed
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    // On non-Mac, just quit
-    app.quit();
-  }
+  if (process.platform !== "darwin") app.quit();
 });
