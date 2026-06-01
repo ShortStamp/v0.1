@@ -6,9 +6,18 @@ import {
   desktopCapturer,
   screen,
   clipboard,
+  dialog,
 } from "electron";
 import { join } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { tmpdir } from "os";
+import ffmpeg from "fluent-ffmpeg";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ffprobeInstaller = require("@ffprobe-installer/ffprobe");
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
 // Simple file-based persistent store
 function getStorePath(): string {
@@ -240,6 +249,155 @@ ipcMain.on("window-hide", () => overlayWindow?.hide());
 ipcMain.on("window-close", () => {
   overlayWindow?.close();
   overlayWindow = null;
+});
+ipcMain.on("window-resize", (_event, height: number) => {
+  if (!overlayWindow) return;
+  const { workArea } = screen.getPrimaryDisplay();
+  overlayWindow.setSize(BAR_WIDTH, height);
+  overlayWindow.setPosition(
+    workArea.x + Math.floor((workArea.width - BAR_WIDTH) / 2),
+    workArea.y,
+  );
+});
+
+// ── File helpers ──────────────────────────────────────────────────────────────
+
+async function getVideoDuration(videoPath: string): Promise<number> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(videoPath, (err, metadata) => {
+      if (err || !metadata?.format?.duration) {
+        resolve(60); // fallback: assume 60s
+      } else {
+        resolve(metadata.format.duration as number);
+      }
+    });
+  });
+}
+
+async function extractFramesAtTimes(videoPath: string, times: number[]): Promise<string[]> {
+  const dir = tmpdir();
+  const frames: string[] = [];
+
+  for (const t of times) {
+    const outPath = join(dir, `ss_${Date.now()}_${Math.round(t * 1000)}.jpg`);
+    await new Promise<void>((resolve) => {
+      ffmpeg(videoPath)
+        .seekInput(t)
+        .frames(1)
+        .size("1280x?")
+        .output(outPath)
+        .on("end", () => resolve())
+        .on("error", () => resolve())
+        .run();
+    });
+    try {
+      if (existsSync(outPath)) {
+        frames.push(readFileSync(outPath).toString("base64"));
+        unlinkSync(outPath);
+      }
+    } catch { /* skip */ }
+  }
+
+  return frames;
+}
+
+async function extractVideoFrames(videoPath: string): Promise<string[]> {
+  const duration = await getVideoDuration(videoPath);
+
+  // 8 evenly-spaced frames across the full video
+  const step = duration / 9;
+  const evenTimes = Array.from({ length: 8 }, (_, i) => step * (i + 1));
+
+  // 3 burst clusters (4 frames each, 0.1s apart) at 20%, 50%, 75%
+  // Tight spacing reveals per-frame morphing/flickering that exposes AI generation
+  const burstOffsets = [0, 0.1, 0.2, 0.3];
+  const burst1 = burstOffsets.map((o) => duration * 0.20 + o);
+  const burst2 = burstOffsets.map((o) => duration * 0.50 + o);
+  const burst3 = burstOffsets.map((o) => duration * 0.75 + o);
+
+  const allTimes = [...evenTimes, ...burst1, ...burst2, ...burst3];
+  return extractFramesAtTimes(videoPath, allTimes);
+}
+
+async function apiPost(path: string, body: object): Promise<object> {
+  const token = storeGet("token");
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    if (response.status === 401) { storeDelete("token"); storeDelete("email"); throw new Error("Session expired"); }
+    if (response.status === 402) throw new Error("Subscription required");
+    const data = await response.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(data.detail || `API error ${response.status}`);
+  }
+  return response.json();
+}
+
+// IPC: open native file picker
+ipcMain.handle("open-file-picker", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [
+      {
+        name: "Supported Files",
+        extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "mp4", "mov", "avi", "mkv", "webm", "m4v", "txt", "md", "csv", "json", "pdf"],
+      },
+    ],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+// IPC: analyze a local file (image / text / PDF / video)
+// mode: "screen" | "highlight" | "video" | "ai"
+ipcMain.handle("analyze-file", async (_event, filePath: string, mode: string = "screen") => {
+  const ext = (filePath.split(".").pop() ?? "").toLowerCase();
+
+  // ── Images ──────────────────────────────────────────
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) {
+    const mediaType =
+      ext === "png" ? "image/png"
+      : ext === "gif" ? "image/gif"
+      : ext === "webp" ? "image/webp"
+      : "image/jpeg";
+    const hint = mode === "ai" ? "Focus on detecting AI-generated or deepfake content."
+      : mode === "highlight" ? "Fact-check any claims visible in this image."
+      : undefined;
+    return apiPost("/analyze", {
+      image_base64: readFileSync(filePath).toString("base64"),
+      media_type: mediaType,
+      ...(hint ? { hint } : {}),
+    });
+  }
+
+  // ── Text / PDF ───────────────────────────────────────
+  if (["txt", "md", "csv", "json", "pdf"].includes(ext)) {
+    let text: string;
+    if (ext === "pdf") {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require("pdf-parse");
+      const data = await pdfParse(readFileSync(filePath));
+      text = (data.text as string).slice(0, 8000);
+    } else {
+      text = readFileSync(filePath, "utf-8").slice(0, 8000);
+    }
+    const textMode = mode === "ai" ? "ai_detection" : "factcheck";
+    return apiPost("/analyze-text", { text, mode: textMode });
+  }
+
+  // ── Video ────────────────────────────────────────────
+  if (["mp4", "mov", "avi", "mkv", "webm", "m4v"].includes(ext)) {
+    const frames = await extractVideoFrames(filePath);
+    if (frames.length === 0) throw new Error("Could not extract frames from this video file.");
+    const videoMode = mode === "ai" ? "ai_detection" : "video";
+    return apiPost("/analyze-frames", { frames, mode: videoMode });
+  }
+
+  throw new Error(`Unsupported file type: .${ext}`);
 });
 
 app.whenReady().then(() => {

@@ -48,6 +48,15 @@ contextBridge.exposeInMainWorld("shortstamp", {
 
   hide: (): void => ipcRenderer.send("window-hide"),
   close: (): void => ipcRenderer.send("window-close"),
+  resize: (height: number): void => ipcRenderer.send("window-resize", height),
+
+  openFilePicker: (): Promise<string | null> => ipcRenderer.invoke("open-file-picker"),
+  analyzeFile: (filePath: string, mode: string): Promise<{
+    verdict: "REAL" | "FAKE" | "SCAM" | "AI_GENERATED" | "UNCERTAIN";
+    confidence: number;
+    explanation: string;
+    category: string;
+  }> => ipcRenderer.invoke("analyze-file", filePath, mode),
 
   onStartAnalysis: (callback: () => void) => {
     ipcRenderer.on("start-analysis", callback);

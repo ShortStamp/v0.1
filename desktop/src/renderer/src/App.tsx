@@ -13,6 +13,9 @@ declare global {
       logout: () => Promise<boolean>;
       hide: () => void;
       close: () => void;
+      resize: (height: number) => void;
+      openFilePicker: () => Promise<string | null>;
+      analyzeFile: (filePath: string, mode: string) => Promise<AnalysisResult>;
       onStartAnalysis: (callback: () => void) => () => void;
     };
   }
@@ -44,6 +47,9 @@ const INPUT_PLACEHOLDER: Record<Mode, string> = {
   ai: "Paste text or a video URL to detect AI...",
 };
 
+const BAR_HEIGHT = 96;
+const EXPANDED_HEIGHT = 300;
+
 const isMac = navigator.platform.toLowerCase().includes("mac");
 const shortcutHint = isMac ? "⌘⇧S" : "Ctrl+Shift+S";
 
@@ -53,28 +59,38 @@ export default function App() {
   const [inputText, setInputText] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<{ path: string; name: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const toggleMode = (m: Mode) => {
-    setMode((prev) => (prev === m ? "screen" : m));
-    if (m !== "highlight") {
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  };
-
-  const startDismissTimer = (delay: number) => {
-    dismissTimer.current = setTimeout(() => setAppState("idle"), delay);
+  const collapse = () => {
+    setExpanded(false);
+    window.shortstamp.resize(BAR_HEIGHT);
   };
 
   const dismiss = () => {
-    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    collapse();
     setAppState("idle");
+    setResult(null);
   };
+
+  const toggleMode = (m: Mode) => {
+    setMode((prev) => (prev === m ? "screen" : m));
+    if (m !== "highlight") setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const handleAttachment = async () => {
+    const filePath = await window.shortstamp.openFilePicker();
+    if (!filePath) return;
+    const name = filePath.split("/").pop() ?? filePath;
+    setAttachedFile({ path: filePath, name });
+  };
+
+  const clearAttachment = () => setAttachedFile(null);
 
   const runAnalysis = async () => {
     if (appState === "analyzing") return;
-    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    collapse();
     setAppState("analyzing");
     setResult(null);
     setErrorMessage(null);
@@ -82,24 +98,22 @@ export default function App() {
     try {
       let analysisResult: AnalysisResult;
 
-      if (mode === "highlight") {
+      if (attachedFile) {
+        analysisResult = await window.shortstamp.analyzeFile(attachedFile.path, mode);
+        setAttachedFile(null);
+      } else if (mode === "highlight") {
         const text = await window.shortstamp.readClipboard();
         if (!text.trim()) throw new Error("No text found — copy text first, then press " + shortcutHint);
         analysisResult = await window.shortstamp.analyzeText(text, "factcheck");
-
       } else if (mode === "video") {
         if (!inputText.trim()) throw new Error("Paste a video URL to analyze");
         analysisResult = await window.shortstamp.analyzeUrl(inputText.trim(), "video");
-
       } else if (mode === "ai") {
         if (!inputText.trim()) throw new Error("Paste text or a URL to check");
         const isUrl = /^https?:\/\//i.test(inputText.trim());
-        if (isUrl) {
-          analysisResult = await window.shortstamp.analyzeUrl(inputText.trim(), "ai_detection");
-        } else {
-          analysisResult = await window.shortstamp.analyzeText(inputText.trim(), "ai_detection");
-        }
-
+        analysisResult = isUrl
+          ? await window.shortstamp.analyzeUrl(inputText.trim(), "ai_detection")
+          : await window.shortstamp.analyzeText(inputText.trim(), "ai_detection");
       } else {
         const imageBase64 = await window.shortstamp.captureScreen();
         analysisResult = await window.shortstamp.analyze(imageBase64, inputText.trim() || undefined);
@@ -107,11 +121,13 @@ export default function App() {
 
       setResult(analysisResult);
       setAppState("result");
-      startDismissTimer(10000);
+      setExpanded(true);
+      window.shortstamp.resize(EXPANDED_HEIGHT);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Analysis failed");
       setAppState("error");
-      startDismissTimer(6000);
+      setExpanded(true);
+      window.shortstamp.resize(EXPANDED_HEIGHT);
     }
   };
 
@@ -128,7 +144,7 @@ export default function App() {
 
   return (
     <div className="widget-root">
-      {/* ── Row 1: brand / result / actions ── */}
+      {/* ── Row 1: brand / status / actions ── */}
       <div className="bar-row drag-region">
         <div className="bar-brand no-drag">
           <div className="brand-mark">SS</div>
@@ -146,32 +162,31 @@ export default function App() {
               }
             </span>
           )}
-
           {appState === "analyzing" && (
             <div className="analyzing-row">
               <div className="analyzing-dots"><span /><span /><span /></div>
               <span className="state-label">{analyzeLabel}...</span>
             </div>
           )}
-
-          {appState === "result" && result && (
+          {(appState === "result" || appState === "error") && (
             <div className="result-row">
-              <span className={`verdict-chip verdict-${result.verdict}`}>
-                {VERDICT_LABEL[result.verdict]}
+              {appState === "result" && result && (
+                <span className={`verdict-chip verdict-${result.verdict}`}>
+                  {VERDICT_LABEL[result.verdict]}
+                </span>
+              )}
+              {appState === "error" && (
+                <span className="verdict-chip verdict-error">ERROR</span>
+              )}
+              <div className="inline-sep" />
+              <span className="explanation">
+                {appState === "result" && result ? result.explanation : errorMessage}
               </span>
-              <div className="inline-sep" />
-              <span className="explanation">{result.explanation}</span>
-              <span className="confidence">{result.confidence}%</span>
-              <button className="dismiss-btn" onClick={dismiss}>×</button>
-            </div>
-          )}
-
-          {appState === "error" && (
-            <div className="result-row">
-              <span className="verdict-chip verdict-error">ERROR</span>
-              <div className="inline-sep" />
-              <span className="explanation">{errorMessage}</span>
-              <button className="dismiss-btn" onClick={dismiss}>×</button>
+              {!expanded && (
+                <button className="expand-btn no-drag" onClick={() => { setExpanded(true); window.shortstamp.resize(EXPANDED_HEIGHT); }}>
+                  ↓
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -196,48 +211,70 @@ export default function App() {
       {/* ── Row 2: toolbar ── */}
       <div className="toolbar-row no-drag">
         <div className="mode-buttons">
-          <button
-            className={`mode-btn ${mode === "highlight" ? "active" : ""}`}
-            onClick={() => toggleMode("highlight")}
-            title="Highlight & fact-check selected text"
-          >
-            <HighlightIcon />
-          </button>
-          <button
-            className={`mode-btn ${mode === "video" ? "active" : ""}`}
-            onClick={() => toggleMode("video")}
-            title="Analyze a video by URL"
-          >
-            <VideoIcon />
-          </button>
-          <button
-            className={`mode-btn ${mode === "ai" ? "active" : ""}`}
-            onClick={() => toggleMode("ai")}
-            title="Detect AI-generated content"
-          >
-            <AIIcon />
-          </button>
+          <button className={`mode-btn ${mode === "highlight" ? "active" : ""}`} onClick={() => toggleMode("highlight")} title="Highlight & fact-check selected text"><HighlightIcon /></button>
+          <button className={`mode-btn ${mode === "video" ? "active" : ""}`} onClick={() => toggleMode("video")} title="Analyze a video by URL"><VideoIcon /></button>
+          <button className={`mode-btn ${mode === "ai" ? "active" : ""}`} onClick={() => toggleMode("ai")} title="Detect AI-generated content"><AIIcon /></button>
+          <button className="mode-btn" onClick={handleAttachment} title="Attach file (image, video, PDF, text)"><AttachIcon /></button>
         </div>
-
         <div className="toolbar-sep" />
-
-        <input
-          ref={inputRef}
-          className="toolbar-input"
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && runAnalysis()}
-          placeholder={INPUT_PLACEHOLDER[mode]}
-          spellCheck={false}
-        />
-
-        {inputText.trim() && (
-          <button className="submit-btn" onClick={runAnalysis} title="Submit">
-            <SubmitIcon />
-          </button>
+        {attachedFile ? (
+          <div className="file-chip">
+            <span className="file-chip-name">{attachedFile.name}</span>
+            <button className="file-chip-clear" onClick={clearAttachment}>×</button>
+          </div>
+        ) : (
+          <input
+            ref={inputRef}
+            className="toolbar-input"
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && runAnalysis()}
+            placeholder={INPUT_PLACEHOLDER[mode]}
+            spellCheck={false}
+          />
+        )}
+        {(attachedFile || inputText.trim()) && (
+          <button className="submit-btn" onClick={runAnalysis} title="Submit"><SubmitIcon /></button>
         )}
       </div>
+
+      {/* ── Expanded result panel ── */}
+      {expanded && (
+        <div className="result-panel no-drag">
+          <div className="result-panel-header">
+            <button className="back-btn" onClick={collapse} title="Collapse">
+              ←
+            </button>
+            {appState === "result" && result && (
+              <span className={`verdict-chip verdict-${result.verdict}`}>
+                {VERDICT_LABEL[result.verdict]}
+              </span>
+            )}
+            {appState === "error" && (
+              <span className="verdict-chip verdict-error">ERROR</span>
+            )}
+            <div style={{ flex: 1 }} />
+            <button className="panel-close-btn" onClick={dismiss}>×</button>
+          </div>
+
+          <div className="result-panel-body">
+            {appState === "result" && result && (
+              <p className="full-explanation">{result.explanation}</p>
+            )}
+            {appState === "error" && (
+              <p className="full-explanation error-explanation">{errorMessage}</p>
+            )}
+          </div>
+
+          {appState === "result" && result && (
+            <div className="result-panel-footer">
+              <span className="confidence-label">{result.confidence}% confidence</span>
+              <span className="category-label">{result.category}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -287,6 +324,14 @@ function SubmitIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
       <path d="M2 7 L12 7 M8 3 L12 7 L8 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function AttachIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+      <path d="M13.5 7.5 L7 14 C5.3 15.7 2.6 15.7 1 14 C-0.7 12.3 -0.7 9.6 1 8 L8 1 C9.1 -0.1 10.9 -0.1 12 1 C13.1 2.1 13.1 3.9 12 5 L5.5 11.5 C5 12 4.2 12 3.8 11.5 C3.3 11 3.3 10.2 3.8 9.8 L9.5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }

@@ -81,15 +81,33 @@ You MUST respond with a valid JSON object in this exact format:
 
 Use REAL if the content is factual and legitimate. Use FAKE if claims are false or misleading. Use SCAM if the video is promoting fraud, phishing, or deceptive schemes. Use AI_GENERATED if the speech/content appears AI-synthesized. Category should be "media" for most video content."""
 
-AI_DETECTION_VIDEO_PROMPT = """You are ShortStamp, an AI video detector. You have been given a transcript of a video. Analyze whether the speech, delivery patterns, and content suggest AI generation (text-to-speech, AI voiceover, AI-scripted content, deepfake narration).
+AI_DETECTION_VIDEO_PROMPT = """You are ShortStamp, an expert AI video detector. You will be shown multiple frames extracted from a video — including evenly-spaced frames AND consecutive frames (0.25s apart) to reveal motion-based artifacts that expose AI generation.
 
-Look for: unnatural phrasing, lack of verbal fillers and hesitations, perfectly structured delivery, generic language, absence of genuine human spontaneity.
+Modern AI video generators (Sora, Kling, RunwayML, Pika, Stable Video Diffusion) produce photorealistic individual frames but fail on temporal consistency. Look for these tells:
+
+MOTION ARTIFACTS (most reliable — compare consecutive frames):
+- Objects morphing or shifting shape between frames
+- Hair/fur changing length, style, or position unnaturally
+- Hands/fingers deforming, merging, or gaining/losing digits
+- Inconsistent motion blur — too smooth or physically implausible movement
+- Background elements flickering, warping, or appearing/disappearing
+- Water/fire/smoke that flows in unnatural loops or pulses
+
+VISUAL TELLS (individual frames):
+- Skin texture that is too perfect — airbrushed, pore-free, waxy
+- Lighting that seems baked-in and flat rather than cast from a real source
+- Eyes that are slightly asymmetric or have an uncanny glassiness
+- Text in the scene that is garbled, malformed, or shifts between frames
+- Depth-of-field bokeh that is perfectly uniform (lens simulation artifact)
+- Details in reflections (glasses, windows, puddles) that don't match the scene
+
+Be aggressive: modern AI video is designed to fool casual viewers. If you see even one strong motion artifact between consecutive frames, that alone is high-confidence AI_GENERATED.
 
 You MUST respond with a valid JSON object in this exact format:
 {
   "verdict": "REAL" | "AI_GENERATED" | "UNCERTAIN",
   "confidence": <integer 0-100>,
-  "explanation": "<1-3 clear sentences explaining your verdict>",
+  "explanation": "<2-3 sentences citing specific visual evidence from the frames, especially motion artifacts>",
   "category": "media"
 }"""
 
@@ -97,6 +115,7 @@ You MUST respond with a valid JSON object in this exact format:
 class AnalyzeRequest(BaseModel):
     image_base64: str
     hint: str | None = None
+    media_type: str = "image/png"
 
     @field_validator("image_base64")
     @classmethod
@@ -108,6 +127,11 @@ class AnalyzeRequest(BaseModel):
         except Exception:
             raise ValueError("Invalid base64 image data")
         return v
+
+
+class AnalyzeFramesRequest(BaseModel):
+    frames: list[str]
+    mode: Literal["video", "ai_detection"] = "ai_detection"
 
 
 class AnalyzeTextRequest(BaseModel):
@@ -138,43 +162,187 @@ def _extract_youtube_id(url: str) -> str | None:
     return None
 
 
-async def _get_video_transcript(url: str) -> str:
-    """Return transcript text for a video URL, or raise HTTPException."""
+def _is_twitter_url(url: str) -> bool:
+    return bool(re.search(r"(?:twitter\.com|x\.com)/\S+/status/\d+", url))
+
+
+async def _download_twitter_video_frames(url: str) -> list[str]:
+    """Download a Twitter/X video with yt-dlp and extract frames using imageio-ffmpeg.
+    Returns a list of base64-encoded JPEG frames."""
+    import tempfile
+    import asyncio
+    import os
+
+    def _do_download_and_extract() -> list[str]:
+        try:
+            import yt_dlp
+            import imageio
+            import numpy as np
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                video_path = os.path.join(tmpdir, "video.mp4")
+                ydl_opts = {
+                    "outtmpl": video_path,
+                    "format": "mp4/best[height<=720]",
+                    "quiet": True,
+                    "no_warnings": True,
+                    "noplaylist": True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+
+                if not os.path.exists(video_path):
+                    # yt-dlp may have added extension
+                    candidates = [f for f in os.listdir(tmpdir) if f.startswith("video")]
+                    if not candidates:
+                        return []
+                    video_path = os.path.join(tmpdir, candidates[0])
+
+                reader = imageio.get_reader(video_path, "ffmpeg")
+                meta = reader.get_meta_data()
+                fps = meta.get("fps", 30)
+                n_frames = reader.count_frames() if hasattr(reader, "count_frames") else None
+
+                # Get duration in seconds
+                duration = meta.get("duration", None)
+                if not duration and n_frames:
+                    duration = n_frames / fps
+
+                frames_b64: list[str] = []
+
+                if duration and duration > 0:
+                    # 6 evenly-spaced timestamps + 2 burst clusters (4 frames each at 0.1s)
+                    even_times = [duration * (i + 1) / 7 for i in range(6)]
+                    burst1 = [duration * 0.25 + i * 0.1 for i in range(4)]
+                    burst2 = [duration * 0.65 + i * 0.1 for i in range(4)]
+                    target_times = even_times + burst1 + burst2
+                else:
+                    # Fallback: grab frames by index
+                    total = n_frames or 100
+                    target_times = [total * (i + 1) / 11 / fps for i in range(10)]
+
+                import io
+                from PIL import Image as PILImage
+
+                for t in target_times:
+                    frame_idx = int(t * fps)
+                    try:
+                        frame = reader.get_data(frame_idx)
+                        img = PILImage.fromarray(frame).convert("RGB")
+                        img.thumbnail((1280, 720))
+                        buf = io.BytesIO()
+                        img.save(buf, format="JPEG", quality=85)
+                        frames_b64.append(base64.b64encode(buf.getvalue()).decode())
+                    except Exception:
+                        continue
+
+                reader.close()
+                return frames_b64
+        except Exception:
+            return []
+
+    return await asyncio.get_event_loop().run_in_executor(None, _do_download_and_extract)
+
+
+async def _get_tweet_content(url: str) -> tuple[str | None, str | None]:
+    """Fetch tweet text and thumbnail via oEmbed (no auth required).
+    Returns (text, thumbnail_base64)."""
+    try:
+        oembed_url = f"https://publish.twitter.com/oembed?url={url}&omit_script=true"
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            resp = await client.get(oembed_url, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            data = resp.json()
+            html = data.get("html", "")
+            text = re.sub(r"<[^>]+>", " ", html)
+            text = re.sub(r"\s+", " ", text).strip()
+            text = text if len(text) > 10 else None
+
+            thumbnail_b64: str | None = None
+            thumb_url = data.get("thumbnail_url")
+            if thumb_url:
+                try:
+                    img_resp = await client.get(thumb_url)
+                    if img_resp.status_code == 200 and len(img_resp.content) > 500:
+                        thumbnail_b64 = base64.b64encode(img_resp.content).decode()
+                except Exception:
+                    pass
+
+            return text, thumbnail_b64
+    except Exception:
+        return None, None
+
+
+async def _fetch_thumbnail_b64(video_id: str) -> str | None:
+    """Fetch the best available YouTube thumbnail and return as base64 JPEG."""
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        for quality in ("maxresdefault", "hqdefault", "mqdefault"):
+            url = f"https://img.youtube.com/vi/{video_id}/{quality}.jpg"
+            try:
+                resp = await client.get(url)
+                if resp.status_code == 200 and len(resp.content) > 1000:
+                    return base64.b64encode(resp.content).decode()
+            except Exception:
+                continue
+    return None
+
+
+async def _get_video_content(url: str) -> tuple[str, str | None]:
+    """Return (transcript, thumbnail_base64) for a video URL.
+    thumbnail_base64 is None if unavailable or non-YouTube."""
+    import asyncio
+
     video_id = _extract_youtube_id(url)
     if video_id:
-        try:
-            from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
-            transcript_list = await __import__("asyncio").get_event_loop().run_in_executor(
-                None,
-                lambda: YouTubeTranscriptApi.get_transcript(video_id, languages=["en", "en-US"]),
-            )
-            return " ".join(entry["text"] for entry in transcript_list)
-        except (NoTranscriptFound, TranscriptsDisabled):
+        # Fetch transcript and thumbnail concurrently
+        async def get_transcript() -> str:
+            try:
+                from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
+                transcript_list = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: YouTubeTranscriptApi.get_transcript(video_id, languages=["en", "en-US"]),
+                )
+                return " ".join(entry["text"] for entry in transcript_list)
+            except Exception:
+                return ""
+
+        transcript, thumbnail = await asyncio.gather(
+            get_transcript(),
+            _fetch_thumbnail_b64(video_id),
+        )
+
+        if not transcript and not thumbnail:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No English transcript available for this video.",
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Could not fetch transcript: {e}",
+                detail="Could not fetch transcript or thumbnail for this video.",
             )
 
-    # Non-YouTube URL: try fetching page text as a fallback
+        return transcript, thumbnail
+
+    # X.com / Twitter: use oEmbed for text + thumbnail (frames handled in analyze_url)
+    if _is_twitter_url(url):
+        text, thumbnail_b64 = await _get_tweet_content(url)
+        if not text and not thumbnail_b64:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Could not fetch this tweet. It may be private or deleted.",
+            )
+        return text or "", thumbnail_b64
+
+    # Generic fallback: fetch page HTML and strip tags
     try:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
             resp.raise_for_status()
-            # Strip HTML tags for a rough text extraction
             text = re.sub(r"<[^>]+>", " ", resp.text)
             text = re.sub(r"\s+", " ", text).strip()
             if len(text) < 100:
                 raise ValueError("Too little text")
-            return text[:8000]
+            return text[:8000], None
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Could not fetch content from this URL. YouTube links and public web pages are supported.",
+            detail="Could not fetch content from this URL. YouTube and X.com links are supported.",
         )
 
 
@@ -202,10 +370,86 @@ async def _call_claude(system: str, user_text: str, settings) -> AnalyzeResponse
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     try:
         message = await client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-6",
             max_tokens=512,
             system=system,
             messages=[{"role": "user", "content": user_text}],
+        )
+        return _parse_claude_response(message.content[0].text.strip())
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"AI service error: {e}")
+    except (ValueError, KeyError, TypeError) as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to parse AI response: {e}")
+
+
+async def _call_claude_video(system: str, transcript: str, thumbnail_b64: str | None, url: str, settings) -> AnalyzeResponse:
+    """Call Claude with thumbnail image (if available) + transcript text."""
+    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+    content: list = []
+    if thumbnail_b64:
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/jpeg", "data": thumbnail_b64},
+        })
+
+    text_parts = [f"Video URL: {url}"]
+    if transcript:
+        text_parts.append(f"Transcript:\n{transcript[:8000]}")
+    if thumbnail_b64:
+        text_parts.append("(A thumbnail frame from the video is shown above.)")
+    text_parts.append("Respond with JSON only.")
+    content.append({"type": "text", "text": "\n\n".join(text_parts)})
+
+    try:
+        message = await client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            system=system,
+            messages=[{"role": "user", "content": content}],
+        )
+        return _parse_claude_response(message.content[0].text.strip())
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"AI service error: {e}")
+    except (ValueError, KeyError, TypeError) as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to parse AI response: {e}")
+
+
+async def _analyze_frames_with_claude(frames: list[str], mode: str, settings) -> AnalyzeResponse:
+    """Shared helper: send extracted video frames to Claude for analysis."""
+    system = AI_DETECTION_VIDEO_PROMPT if mode == "ai_detection" else VIDEO_ANALYSIS_PROMPT
+    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+    capped = frames[:20]
+    n_even = min(6, len(capped))
+    n_burst_total = len(capped) - n_even
+    cluster_size = 4
+
+    content: list = []
+    for frame in capped:
+        content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": frame}})
+
+    if mode == "ai_detection":
+        action = f"You have been given {len(capped)} frames from a video. Images 1–{n_even}: evenly-spaced overview frames. "
+        if n_burst_total > 0:
+            action += (
+                f"Images {n_even + 1}–{n_even + cluster_size}: consecutive frames (0.1s apart) at ~25% into the video. "
+                f"Images {n_even + cluster_size + 1}–{n_even + cluster_size * 2}: consecutive frames (0.1s apart) at ~50%. "
+                f"Images {n_even + cluster_size * 2 + 1}–{len(capped)}: consecutive frames (0.1s apart) at ~65%. "
+                f"Compare the consecutive clusters frame-by-frame for morphing, flickering, or impossible motion that exposes AI generation. "
+            )
+        action += "Detect whether this video is AI-generated."
+    else:
+        action = f"These are {len(capped)} frames from a video. Analyze for legitimacy."
+
+    content.append({"type": "text", "text": f"{action} Respond with JSON only."})
+
+    try:
+        message = await client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            system=system,
+            messages=[{"role": "user", "content": content}],
         )
         return _parse_claude_response(message.content[0].text.strip())
     except anthropic.APIError as e:
@@ -248,7 +492,7 @@ async def analyze(
 
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     user_content: list = [
-        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": body.image_base64}},
+        {"type": "image", "source": {"type": "base64", "media_type": body.media_type, "data": body.image_base64}},
         {"type": "text", "text": (
             f"User hint: {body.hint}\n\nAnalyze the screenshot above for legitimacy. Respond with JSON only."
             if body.hint else
@@ -257,7 +501,7 @@ async def analyze(
     ]
     try:
         message = await client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-6",
             max_tokens=512,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
@@ -292,13 +536,38 @@ async def analyze_url(
     body: AnalyzeUrlRequest,
     current_user: User = Depends(get_subscribed_user),
 ):
-    """Analyze a video or web URL — fetches transcript/content then runs AI analysis."""
-    transcript = await _get_video_transcript(body.url)
+    """Analyze a video URL — fetches thumbnail + transcript, runs visual + text AI analysis."""
+
+    # For Twitter/X URLs: download video and extract frames for real visual analysis
+    if _is_twitter_url(body.url):
+        frames = await _download_twitter_video_frames(body.url)
+        if frames:
+            if settings.anthropic_api_key in (None, "", "demo"):
+                verdicts: list[Verdict] = ["REAL", "AI_GENERATED", "UNCERTAIN"] if body.mode == "ai_detection" else None
+                return _demo_response(verdicts)
+            return await _analyze_frames_with_claude(frames, body.mode, settings)
+
+    transcript, thumbnail_b64 = await _get_video_content(body.url)
+
+    if settings.anthropic_api_key in (None, "", "demo"):
+        verdicts2: list[Verdict] = ["REAL", "AI_GENERATED", "UNCERTAIN"] if body.mode == "ai_detection" else None
+        return _demo_response(verdicts2)
+
+    system = AI_DETECTION_VIDEO_PROMPT if body.mode == "ai_detection" else VIDEO_ANALYSIS_PROMPT
+    return await _call_claude_video(system, transcript, thumbnail_b64, body.url, settings)
+
+
+@router.post("-frames", response_model=AnalyzeResponse)
+async def analyze_frames(
+    body: AnalyzeFramesRequest,
+    current_user: User = Depends(get_subscribed_user),
+):
+    """Analyze frames extracted from a local video file."""
+    if not body.frames:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No frames provided.")
 
     if settings.anthropic_api_key in (None, "", "demo"):
         verdicts: list[Verdict] = ["REAL", "AI_GENERATED", "UNCERTAIN"] if body.mode == "ai_detection" else None
         return _demo_response(verdicts)
 
-    system = AI_DETECTION_VIDEO_PROMPT if body.mode == "ai_detection" else VIDEO_ANALYSIS_PROMPT
-    user_text = f"Video URL: {body.url}\n\nTranscript:\n{transcript[:8000]}\n\nRespond with JSON only."
-    return await _call_claude(system, user_text, settings)
+    return await _analyze_frames_with_claude(body.frames, body.mode, settings)
