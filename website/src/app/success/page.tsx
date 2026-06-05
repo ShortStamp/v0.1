@@ -38,53 +38,32 @@ export default function SuccessPage() {
           {/* Download options */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black mb-10">
             <a
-              href="#"
+              href="https://github.com/ShortStamp/v0.1/releases/latest/download/ShortStamp-0.1.0-mac.dmg"
               className="bg-white hover:bg-gray-50 transition-colors duration-200 p-8 flex flex-col items-start gap-3 group"
             >
-              <svg
-                className="w-8 h-8"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3"
-                />
+              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
               <div className="text-left">
                 <p className="text-xs font-bold tracking-[0.15em] uppercase text-gray-400 mb-1">
                   macOS
                 </p>
                 <p className="text-sm font-bold">Download .dmg</p>
+                <p className="text-xs text-gray-400 mt-1">Intel · Apple Silicon via Rosetta</p>
               </div>
             </a>
-            <a
-              href="#"
-              className="bg-white hover:bg-gray-50 transition-colors duration-200 p-8 flex flex-col items-start gap-3 group"
-            >
-              <svg
-                className="w-8 h-8"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z"
-                />
+            <div className="bg-white p-8 flex flex-col items-start gap-3 opacity-40 cursor-not-allowed">
+              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
               <div className="text-left">
                 <p className="text-xs font-bold tracking-[0.15em] uppercase text-gray-400 mb-1">
                   Windows
                 </p>
-                <p className="text-sm font-bold">Download .exe</p>
+                <p className="text-sm font-bold">Coming Soon</p>
+                <p className="text-xs text-gray-400 mt-1">Windows build in progress</p>
               </div>
-            </a>
+            </div>
           </div>
 
           {/* Setup instructions */}

@@ -53,6 +53,12 @@ export default function Home() {
             >
               Pricing
             </a>
+            <a
+              href="#download"
+              className="text-xs font-bold tracking-[0.15em] uppercase text-gray-500 hover:text-black transition-colors duration-200"
+            >
+              Download
+            </a>
             <Link
               href="/subscribe"
               className="bg-black text-white px-5 py-2 text-xs font-bold tracking-[0.15em] uppercase hover:bg-gray-800 transition-colors duration-200"
@@ -235,6 +241,50 @@ export default function Home() {
               Secure payment via Stripe · 30-day money-back guarantee
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Download */}
+      <section id="download" className="border-b border-black">
+        <div className="max-w-6xl mx-auto px-6 py-24">
+          <div className="mb-16">
+            <p className="text-xs font-bold tracking-[0.2em] uppercase text-gray-400 mb-4">
+              Download
+            </p>
+            <h2 className="text-5xl font-bold tracking-tight">
+              Get the app.
+              <br />
+              Start stamping.
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-black max-w-2xl">
+            <a
+              href="https://github.com/ShortStamp/v0.1/releases/latest/download/ShortStamp-0.1.0-mac.dmg"
+              className="bg-white hover:bg-gray-50 transition-colors duration-200 p-10 flex flex-col gap-5"
+            >
+              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              <div>
+                <p className="text-xs font-bold tracking-[0.15em] uppercase text-gray-400 mb-1">macOS</p>
+                <p className="text-lg font-bold mb-1">Download .dmg</p>
+                <p className="text-xs text-gray-500">Intel · Apple Silicon via Rosetta · v0.1.0</p>
+              </div>
+            </a>
+            <div className="bg-white p-10 flex flex-col gap-5 opacity-40">
+              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              <div>
+                <p className="text-xs font-bold tracking-[0.15em] uppercase text-gray-400 mb-1">Windows</p>
+                <p className="text-lg font-bold mb-1">Coming Soon</p>
+                <p className="text-xs text-gray-500">Windows build in progress</p>
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-6">
+            Requires an active subscription · <Link href="/subscribe" className="underline hover:text-black transition-colors">Subscribe for $60/mo</Link>
+          </p>
         </div>
       </section>
 
