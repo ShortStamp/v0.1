@@ -69,17 +69,25 @@ You MUST respond with a valid JSON object in this exact format:
 
 Use REAL if the text reads as genuinely human-written. Use AI_GENERATED if patterns strongly suggest AI authorship. Use UNCERTAIN if signals are mixed. Category should almost always be "general" or "fact"."""
 
-VIDEO_ANALYSIS_PROMPT = """You are ShortStamp, an AI legitimacy checker for video content. You have been given a transcript of a video. Analyze whether the claims, information, and intent in this video are legitimate.
+VIDEO_ANALYSIS_PROMPT = """You are ShortStamp, an AI fact-checker for video content. You will be given a full transcript. Your job is to go through the ENTIRE transcript and fact-check every significant claim made — not just the introduction.
+
+For each distinct factual claim in the transcript, state whether it is TRUE, FALSE, MISLEADING, or UNVERIFIABLE, and give a one-sentence reason. Cover claims from throughout the whole video, not just the beginning.
 
 You MUST respond with a valid JSON object in this exact format:
 {
-  "verdict": "REAL" | "FAKE" | "SCAM" | "AI_GENERATED" | "UNCERTAIN",
+  "verdict": "REAL" | "FAKE" | "SCAM" | "UNCERTAIN",
   "confidence": <integer 0-100>,
-  "explanation": "<1-3 clear sentences explaining your verdict>",
+  "explanation": "• \"<exact or paraphrased claim>\" → TRUE/FALSE/MISLEADING/UNVERIFIABLE — <one sentence reason>\n• \"<next claim>\" → TRUE/FALSE/MISLEADING/UNVERIFIABLE — <one sentence reason>\n[continue for every significant claim in the transcript]\n\nOverall: <one sentence summary verdict>",
   "category": "fact" | "link" | "media" | "general"
 }
 
-Use REAL if the content is factual and legitimate. Use FAKE if claims are false or misleading. Use SCAM if the video is promoting fraud, phishing, or deceptive schemes. Use AI_GENERATED if the speech/content appears AI-synthesized. Category should be "media" for most video content."""
+Verdict guidelines:
+- REAL: The content is predominantly accurate with no significant false claims
+- FAKE: One or more significant claims are false or seriously misleading
+- SCAM: The video promotes fraud, phishing, or deceptive schemes
+- UNCERTAIN: Not enough information to verify the main claims
+
+Do NOT use AI_GENERATED — this mode is strictly for fact-checking. Category should be "media" for most video content. Do NOT summarize — fact-check each claim individually."""
 
 AI_DETECTION_VIDEO_PROMPT = """You are ShortStamp, an expert AI video detector. You will be shown multiple frames extracted from a video — including evenly-spaced frames AND consecutive frames (0.25s apart) to reveal motion-based artifacts that expose AI generation.
 
@@ -297,12 +305,13 @@ async def _get_video_content(url: str) -> tuple[str, str | None]:
         # Fetch transcript and thumbnail concurrently
         async def get_transcript() -> str:
             try:
-                from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
-                transcript_list = await asyncio.get_event_loop().run_in_executor(
+                from youtube_transcript_api import YouTubeTranscriptApi
+                api = YouTubeTranscriptApi()
+                fetched = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: YouTubeTranscriptApi.get_transcript(video_id, languages=["en", "en-US"]),
+                    lambda: api.fetch(video_id),
                 )
-                return " ".join(entry["text"] for entry in transcript_list)
+                return " ".join(s.text for s in fetched)
             except Exception:
                 return ""
 
@@ -395,16 +404,16 @@ async def _call_claude_video(system: str, transcript: str, thumbnail_b64: str | 
 
     text_parts = [f"Video URL: {url}"]
     if transcript:
-        text_parts.append(f"Transcript:\n{transcript[:8000]}")
+        text_parts.append(f"Full transcript:\n{transcript[:30000]}")
     if thumbnail_b64:
         text_parts.append("(A thumbnail frame from the video is shown above.)")
-    text_parts.append("Respond with JSON only.")
+    text_parts.append("Fact-check every significant claim in the transcript above. Respond with JSON only.")
     content.append({"type": "text", "text": "\n\n".join(text_parts)})
 
     try:
         message = await client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=512,
+            max_tokens=2048,
             system=system,
             messages=[{"role": "user", "content": content}],
         )

@@ -32,13 +32,27 @@ interface AnalysisResult {
   category: string;
 }
 
-const VERDICT_LABEL: Record<Verdict, string> = {
+const VERDICT_LABEL_DEFAULT: Record<Verdict, string> = {
   REAL: "REAL",
   FAKE: "FAKE",
   SCAM: "SCAM",
   AI_GENERATED: "AI GEN",
   UNCERTAIN: "UNCERTAIN",
 };
+
+const VERDICT_LABEL_FACTCHECK: Record<Verdict, string> = {
+  REAL: "ACCURATE",
+  FAKE: "MISLEADING",
+  SCAM: "SCAM",
+  AI_GENERATED: "MISLEADING",
+  UNCERTAIN: "UNVERIFIED",
+};
+
+function verdictLabel(verdict: Verdict, mode: Mode): string {
+  return (mode === "video" || mode === "highlight")
+    ? VERDICT_LABEL_FACTCHECK[verdict]
+    : VERDICT_LABEL_DEFAULT[verdict];
+}
 
 const INPUT_PLACEHOLDER: Record<Mode, string> = {
   screen: "Type a hint or question about your screen...",
@@ -48,7 +62,7 @@ const INPUT_PLACEHOLDER: Record<Mode, string> = {
 };
 
 const BAR_HEIGHT = 96;
-const EXPANDED_HEIGHT = 300;
+const EXPANDED_HEIGHT = 600;
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 const shortcutHint = isMac ? "⌘⇧S" : "Ctrl+Shift+S";
@@ -172,7 +186,7 @@ export default function App() {
             <div className="result-row">
               {appState === "result" && result && (
                 <span className={`verdict-chip verdict-${result.verdict}`}>
-                  {VERDICT_LABEL[result.verdict]}
+                  {verdictLabel(result.verdict, mode)}
                 </span>
               )}
               {appState === "error" && (
@@ -248,7 +262,7 @@ export default function App() {
             </button>
             {appState === "result" && result && (
               <span className={`verdict-chip verdict-${result.verdict}`}>
-                {VERDICT_LABEL[result.verdict]}
+                {verdictLabel(result.verdict, mode)}
               </span>
             )}
             {appState === "error" && (
@@ -260,7 +274,11 @@ export default function App() {
 
           <div className="result-panel-body">
             {appState === "result" && result && (
-              <p className="full-explanation">{result.explanation}</p>
+              <div className="full-explanation">
+                {result.explanation.split("\n").map((line, i) => (
+                  <p key={i} style={{ margin: "0 0 4px 0" }}>{line}</p>
+                ))}
+              </div>
             )}
             {appState === "error" && (
               <p className="full-explanation error-explanation">{errorMessage}</p>
